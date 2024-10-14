@@ -43,14 +43,13 @@ defmodule Sue.AI do
     {:ok, []}
   end
 
-  @spec chat_completion(bitstring(), :gpt35 | :gpt4, Chat.t(), Account.t()) :: bitstring()
+  @spec chat_completion(bitstring(), :gpt4o | :gpt4omini, Chat.t(), Account.t()) :: bitstring()
   def chat_completion(text, modelversion, chat, account)
       when is_atom(modelversion) do
     model =
       case modelversion do
-        :gpt35 -> "gpt-3.5-turbo"
-        :gpt4 -> "gpt-4-turbo"
         :gpt4o -> "gpt-4o"
+        :gpt4omini -> "gpt-4o-mini"
       end
 
     Logger.debug("Running chat_completion with #{model}")

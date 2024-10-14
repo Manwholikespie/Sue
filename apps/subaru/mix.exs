@@ -26,7 +26,7 @@ defmodule Subaru.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:velocy, "~> 0.1"},
+      {:mint, "~> 1.0"},
       {:arangox, git: "https://github.com/ArangoDB-Community/arangox"},
       {:cachex, "~> 3.4"},
       # override for nostrum discord

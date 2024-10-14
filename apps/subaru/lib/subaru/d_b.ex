@@ -17,8 +17,11 @@ defmodule Subaru.DB do
       username: Application.fetch_env!(:arangox, :username),
       password: Application.fetch_env!(:arangox, :password),
       endpoints: Application.fetch_env!(:arangox, :endpoints),
-      database: database_name
+      database: database_name,
+      client: Arangox.MintClient
     ]
+
+    Logger.info("Authenticating with args: #{options |> inspect()}")
 
     {:ok, conn} = Arangox.start_link(options)
     {:ok, conn, {:continue, :post_init}}
