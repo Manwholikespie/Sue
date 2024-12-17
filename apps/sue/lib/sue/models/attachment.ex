@@ -1,22 +1,23 @@
 defmodule Sue.Models.Attachment do
   alias __MODULE__
-  alias Sue.Models.Message
-
-  @type t() :: %__MODULE__{}
-
-  # 20MiB
-  @max_attachment_size_bytes 20 * 1024 * 1024
-  @tmp_path System.tmp_dir!()
 
   defstruct [
     :id,
-    :filename,
+    :filepath,
     :mime_type,
     :fsize,
     resolved: false,
     errors: [],
     metadata: %{}
   ]
+
+  alias Sue.Models.Message
+
+  @type t() :: %Attachment{}
+
+  # 20MiB
+  @max_attachment_size_bytes 20 * 1024 * 1024
+  @tmp_path System.tmp_dir!()
 
   # TODO: This code is crap. Keep filepath and filename separate.
   #       Update the constructors.
@@ -27,8 +28,7 @@ defmodule Sue.Models.Attachment do
       ) do
     %Attachment{
       id: aid,
-      # message_id: mid,
-      filename: filename,
+      filepath: filename,
       mime_type: mime_type,
       fsize: fsize,
       resolved: true,
@@ -48,9 +48,10 @@ defmodule Sue.Models.Attachment do
 
     %Attachment{
       id: file_unique_id,
+      filepath: nil,
       fsize: fsize,
       resolved: false,
-      errors: check_size_for_errors(fsize) ++ [],
+      errors: check_size_for_errors(fsize),
       mime_type: Map.get(data, :mime_type, "image/jpeg"),
       metadata: %{url: file_url}
     }
@@ -64,13 +65,13 @@ defmodule Sue.Models.Attachment do
   def resolve(%Message{platform: _}, att) do
     with :ok <- check_img_size(att),
          :ok <- check_is_image(att) do
-      att_filepath = dl_url_to_path(att.metadata.url, "#{att.id}")
+      filepath = dl_url_to_path(att.metadata.url, "#{att.id}")
 
       {:ok,
        %Attachment{
          att
          | resolved: true,
-           filename: att_filepath
+           filepath: filepath
        }}
     else
       error -> error
@@ -79,18 +80,21 @@ defmodule Sue.Models.Attachment do
 
   @spec from_url(bitstring()) :: t()
   def from_url(url) do
-    path = dl_url_to_path(url)
+    filepath = dl_url_to_path(url)
 
-    %Attachment{resolved: true, filename: path}
+    %Attachment{
+      resolved: true,
+      filepath: filepath
+    }
   end
 
   @spec dl_url_to_path(binary, binary) :: bitstring()
   def dl_url_to_path(url, filename \\ Sue.Utils.unique_string()) do
-    file_path = Path.join(@tmp_path, filename <> Path.extname(url))
+    filepath = Path.join(@tmp_path, filename <> Path.extname(url))
     {:ok, env} = Tesla.get(url)
-    :ok = File.write!(file_path, env.body)
+    :ok = File.write!(filepath, env.body)
 
-    file_path
+    filepath
   end
 
   defp check_is_image(%Attachment{mime_type: mime_type}) when is_bitstring(mime_type) do

@@ -276,7 +276,7 @@ defmodule Sue.Models.Message do
           for a <- attachments do
             %Attachment{
               id: a.id,
-              filename: a.filename,
+              filepath: a.filename,
               mime_type: MIME.from_path(a.filename),
               fsize: a.size,
               metadata: %{url: a.url, height: a.height, width: a.width},

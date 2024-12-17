@@ -86,7 +86,7 @@ defmodule Sue.Mailbox.IMessage do
 
     args = [
       Path.join(@applescript_dir, "SendImageSingleBuddy.scpt"),
-      att.filename,
+      att.filepath,
       account_id
     ]
 
@@ -99,7 +99,7 @@ defmodule Sue.Mailbox.IMessage do
 
     args = [
       Path.join(@applescript_dir, "SendImage.scpt"),
-      att.filename,
+      att.filepath,
       "iMessage;+;" <> chat_id
     ]
 
