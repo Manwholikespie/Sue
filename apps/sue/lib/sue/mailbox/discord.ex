@@ -49,7 +49,7 @@ defmodule Sue.Mailbox.Discord do
   def send_response_attachments(_, []), do: :ok
 
   def send_response_attachments(msg, [att | atts]) do
-    Api.create_message(msg.metadata.channel_id, file: att.filename)
+    Api.create_message(msg.metadata.channel_id, file: att.filepath)
     send_response_attachments(msg, atts)
   end
 end

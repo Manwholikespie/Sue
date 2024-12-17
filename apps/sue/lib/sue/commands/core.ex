@@ -26,8 +26,7 @@ defmodule Sue.Commands.Core do
 
   def c_name(%Message{args: "", account: %Account{name: name}}) do
     %Response{
-      body:
-        "I'm told your name is #{name}."
+      body: "I'm told your name is #{name}."
     }
   end
 
