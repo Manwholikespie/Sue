@@ -56,11 +56,11 @@ Telegram uses the slash (/) prefix instead. Sue will not respond to you unless y
 6. This program uses [ArangoDB](https://www.arangodb.com/download-major/) as its primary database. In the years since I made this transition, someone there has sadly decided to drop support for MacOS. Eventually, I'll move back to the Mnesia implementation I was using for Sue, but until then, you'll need to install Docker. The following will only start Arango in Docker, as the rest of the Sue Elixir application needs AppleScript to function.
 
 ```bash
-$ brew install docker
-$ brew install docker-compose
+brew install docker
+brew install docker-compose
 
 # in Sue directory
-$ docker-compose up -d
+docker-compose up -d
 ```
 
 6. Make a user account and remember the password. You'll later enter it in the config described below. Create three databases:
@@ -108,34 +108,21 @@ config :openai,
 config :replicate,
   replicate_api_token: "myapikey"
 ```
-10. Install Elixir if you don't already have it. I recommend using [asdf](https://asdf-vm.com/) to install.
+
+8. [Install Elixir](https://gist.github.com/Manwholikespie/1bc76cba05f536fc5ec5f998cb56ac97) if you don't already have it.
+
+9. Install Xcode. This is needed for the sdp tool for [imessaged](github.com/Manwholikespie/imessaged).
 
 ```bash
-# Use whatever version tag it recommends on the website:
-# https://asdf-vm.com/guide/getting-started.html#official-download
-# For me, this is:
-$ git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.13.1
-
-# add ~/.asdf/bin to path
-
-# Install erlang dependencies
-# Discussed in https://github.com/asdf-vm/asdf-erlang
-$ brew install autoconf openssl wxwidgets libxslt fop
-
-# Add erlang and elixir plugins, install and set a version.
-$ asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
-$ asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
-$ asdf install erlang 26.1.2
-$ asdf install elixir 1.15.7
-$ asdf global erlang 26.1.2
-$ asdf global elixir 1.15.7
-
-# add to path: ~/.asdf/shims
+# After installing, switch the active developer directory to Xcode
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
 
-8. `$ mix deps.get`
-9. To create a prod build, run `$ MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
-10. To run in interactive dev mode, you can run `$ iex -S mix`.  If you want to Telegram to autocomplete your commands, run `Sue.post_init()` from within this interactive prompt. Sorry this part is a little scuffed.
+10. `mix deps.get`
+
+11. To create a prod build, run `MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
+
+12. To run in interactive dev mode, you can run `iex -S mix`.  If you want to Telegram to autocomplete your commands, run `Sue.post_init()` from within this interactive prompt. Sorry this part is a little scuffed.
 
 ## How do I add a command?
 
