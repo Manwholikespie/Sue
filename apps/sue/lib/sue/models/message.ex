@@ -276,7 +276,7 @@ defmodule Sue.Models.Message do
           for a <- attachments do
             %Attachment{
               id: a.id,
-              filename: a.filename,
+              filepath: a.filename,
               mime_type: MIME.from_path(a.filename),
               fsize: a.size,
               metadata: %{url: a.url, height: a.height, width: a.width},
@@ -300,7 +300,7 @@ defmodule Sue.Models.Message do
   defp command_args_from_body(platform, body) do
     if has_command?(platform, body) do
       trimmed_body = body |> better_trim()
-      [command | args] = String.split(String.slice(trimmed_body, 1..-1), " ", parts: 2)
+      [command | args] = String.split(String.slice(trimmed_body, 1..-1//1), " ", parts: 2)
       {command |> String.downcase(), Enum.at(args, 0) || "", trimmed_body}
     else
       {"", "", body |> better_trim()}

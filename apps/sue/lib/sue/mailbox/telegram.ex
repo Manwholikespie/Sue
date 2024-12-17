@@ -79,7 +79,7 @@ defmodule Sue.Mailbox.Telegram do
 
   def send_response_attachments(msg, [att | atts]) do
     {_platform, id} = msg.chat.platform_id
-    ExGram.send_photo(id, {:file, att.filename})
+    ExGram.send_photo(id, {:file, att.filepath})
     send_response_attachments(msg, atts)
   end
 end

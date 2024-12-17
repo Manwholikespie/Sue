@@ -1,4 +1,16 @@
 defmodule Sue.Utils do
+  @doc """
+  Resolve a path to an absolute path.
+  """
+  @spec resolve_filepath(bitstring()) :: bitstring()
+  def resolve_filepath(maybe_path) do
+    if String.starts_with?(maybe_path, "~") do
+      Path.expand(maybe_path)
+    else
+      Path.absname(maybe_path)
+    end
+  end
+
   def dbid_number(dbid) do
     Enum.at(String.split(dbid, "/"), 1)
   end
