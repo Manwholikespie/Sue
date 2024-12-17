@@ -1,0 +1,21 @@
+version: "3.8"
+services:
+  # sue_app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: sue_elixir_app
+  #   image: sue_elixir:latest
+  #   environment:
+  #     MIX_ENV: prod
+
+  arangodb:
+    image: arangodb
+    container_name: arangodb_sue
+    ports:
+      - "8529:8529"
+    environment:
+      ARANGO_ROOT_PASSWORD: ${ARANGO_ROOT_PASSWORD}
+    volumes:
+      - ./db_data:/var/lib/arangodb3
+    restart: always

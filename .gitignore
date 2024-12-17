@@ -1,6 +1,8 @@
 notes/
 mnesia/
+db_data/
 .DS_Store
+.env
 
 # Development crumbs
 .elixir_ls/

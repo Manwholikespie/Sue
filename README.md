@@ -32,8 +32,8 @@ The following commands are currently supported:
 !flip
 !fortune
 !gpt
-!gpt4
 !motivate
+!name
 !phrases
 !ping
 !poll
@@ -49,24 +49,31 @@ Telegram uses the slash (/) prefix instead. Sue will not respond to you unless y
 
 ## How do I run it?
 
-Firstly, I aplogize. I used to use Elixir's built-in database, Mnesia, which was great because you didn't have to install anything. Sadly, I had to write many features myself and it has a 2GB storage limit, so I recently switched to [ArangoDB](https://www.arangodb.com/).
-
-1. If you want to use iMessage, you need a mac with iMessage. You may be asked to enable disk access and Message control for this program (or, rather, Terminal/iTerm). I've been primarily testing this on Catalina, but it *should* work on Monterrey and some older versions.
+1. If you want to use iMessage, you need a mac with iMessage. You may be asked to enable disk access and Message control for this program (or, rather, Terminal/iTerm).
 2. If you want to use Telegram, you should make a Telegram API key. Look up how, it's pretty straightforward. Similarly if you want to use ChatGPT, make an OpenAI account and generate an API key.
 3. If you want to use Discord, again, make an API key, a bot, and under gateway intents enable message content intent.
 4. If you wish to disable any platforms such as Telegram or iMessage, modify the platform list under `config/config.exs` to what you wish to keep.
-5. If you want to be able to use commands that write text atop images (currently only !motivate does this), you will need to install imagemagick with pango. **If you don't care about this command, feel free to ignore the rest of this**. If you already have imagemagick installed, you can run `$ convert -list format | grep -i pango` to see if you can at least read it. If you don't see `r--`, you can't read it and need to do the following: If you're on Mac, you're probably using homebrew, in which case you'll need to edit the install file (they removed pango because it depends on cairo which has many dependencies). After running `$ brew edit imagemagick`, you should be in an editor. Add a `depends_on "pango"` near its friends. Remove the `--without-pango`, adding a `--with-pango` near its friends. Save and quit. `$ brew reinstall imagemagick --build-from-source` (or `install` if you hadn't installed to begin with). Run that `-list format` command now and you should see it.
-6. [Download and install ArangoDB](https://www.arangodb.com/download-major/). Make a user account and remember the password. You'll later enter it in the config described below. Create three databases:
+6. This program uses [ArangoDB](https://www.arangodb.com/download-major/) as its primary database. In the years since I made this transition, someone there has sadly decided to drop support for MacOS. Eventually, I'll move back to the Mnesia implementation I was using for Sue, but until then, you'll need to install Docker. The following will only start Arango in Docker, as the rest of the Sue Elixir application needs AppleScript to function.
 
-- subaru_test
-- subaru_dev
-- subaru_prod
+```bash
+$ brew install docker
+$ brew install docker-compose
 
-Make sure the user you created has access to the databases. You can edit user permissions by being in the `_system` database, clicking the `Users` sidebar, selecting a user, then navigating to the `Permissions` tab.
+# in Sue directory
+$ docker-compose up -d
+```
 
-7. `$ git clone https://github.com/inculi/Sue`
-8. `$ cd Sue`
-9. Make a `config/config.secret.exs` file, here is an example:
+6. Make a user account and remember the password. You'll later enter it in the config described below. Create three databases:
+
+```
+subaru_test
+subaru_dev
+subaru_prod
+```
+
+If you don't want to connect via the root Arango account, make sure the user you created has access to the databases. You can edit user permissions by being in the `_system` database, clicking the `Users` sidebar, selecting a user, then navigating to the `Permissions` tab.
+
+7. Make a `config/config.secret.exs` file, here is an example:
 
 ```elixir
 import Config
@@ -126,9 +133,9 @@ $ asdf global elixir 1.15.7
 # add to path: ~/.asdf/shims
 ```
 
-11. `$ mix deps.get`
-12. To create a prod build, run `$ MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
-13. To run in interactive dev mode, you can run `$ iex -S mix`.  If you want to Telegram to autocomplete your commands, run `Sue.post_init()` from within this interactive prompt. Sorry this part is a little scuffed.
+8. `$ mix deps.get`
+9. To create a prod build, run `$ MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
+10. To run in interactive dev mode, you can run `$ iex -S mix`.  If you want to Telegram to autocomplete your commands, run `Sue.post_init()` from within this interactive prompt. Sorry this part is a little scuffed.
 
 ## How do I add a command?
 
@@ -172,35 +179,6 @@ end
 ## Known Issues
 
 - Image functions stopped working in Telegram. I think there's a new Telegram client for Elixir that I'll probably switch to.
-
-## Upgrading from Sue V3.0
-
-Before you update to the new version, go to your current `mnesia/` directory and drill down to the final level where your .DAT files and what-not are stored. Move this last level directory to your project root directory and call it `mydir/` or something. Then create a new file called `export.exs` with this code:
-
-```elixir
-# export.exs
-alias :mnesia, as: Mnesia
-
-:ok = Mnesia.start([dir: String.to_charlist("mydir")])
-:ok = Mnesia.wait_for_tables(Mnesia.system_info(:local_tables), 5_000)
-
-record = {:edges, :_, :_, :_, :_, :_}
-{:atomic, edges} = fn -> Mnesia.match_object(record) end |> Mnesia.transaction()
-:file.write_file("edges.bin", :erlang.term_to_binary(edges))
-
-{:atomic, defns} = fn -> Mnesia.match_object({:defn, :_, :_}) end |> Mnesia.transaction()
-:file.write_file("defns.bin", :erlang.term_to_binary(defns))
-```
-
-Run it: `$ elixir export.exs`
-
-This will generate two files (`edges.bin` and `defns.bin`). Update to the latest version of Sue, keeping these two new files and nothing else. Once you're in the new version of Sue, enter an interactive shell and perform the following:
-
-```elixir
-iex(1)> Sue.DB.import_mnesia_dump("path/to/edges.bin", "path/to/defns.bin")
-```
-
-There you go! I'm hoping this DB switch will be the last. Arango is pretty solid and should support all the future ideas I have for Sue + Desu + Kiku. Mnesia was neat, though.
 
 ## Special Thanks
 

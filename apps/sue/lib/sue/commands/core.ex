@@ -17,10 +17,17 @@ defmodule Sue.Commands.Core do
   Set a name for your account. Helpful when interacting with GPT.
   Usage: !name Jimmy
   """
-  def c_name(%Message{args: ""}) do
+  def c_name(%Message{args: "", account: %Account{name: ""}}) do
     %Response{
       body:
         "Hmm, it seems like you didn't specify a name. To set your name, use !name followed by the name you'd like to use. See !help name for more information."
+    }
+  end
+
+  def c_name(%Message{args: "", account: %Account{name: name}}) do
+    %Response{
+      body:
+        "I'm told your name is #{name}."
     }
   end
 
