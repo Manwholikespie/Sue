@@ -58,10 +58,13 @@ defmodule Sue.Mailbox.IMessage do
     Imessaged.send_message_to_buddy(rsp.body, account_id)
   end
 
+  # TODO: This would only work for iMessage groups, not SMS. Which for me personally
+  #   is how I'd want it to be, but others may not. Changing it now would affect
+  #   group IDs though, most likely.
   defp send_response_text(%Message{chat: %Chat{is_direct: false}} = msg, rsp) do
-    {_platform, chat_id} = msg.chat.platform_id
+    {_platform, "chat" <> _ = chat_id} = msg.chat.platform_id
 
-    Imessaged.send_message_to_chat(rsp.body, chat_id)
+    Imessaged.send_message_to_chat(rsp.body, "iMessage;+;" <> chat_id)
   end
 
   defp send_response_attachments(_msg, []), do: :ok
@@ -75,9 +78,9 @@ defmodule Sue.Mailbox.IMessage do
   end
 
   defp send_response_attachments(%Message{chat: %Chat{is_direct: false}} = msg, [att | atts]) do
-    {_platform, chat_id} = msg.chat.platform_id
+    {_platform, "chat" <> _ = chat_id} = msg.chat.platform_id
 
-    :ok = Imessaged.send_file_to_chat(att.filepath, chat_id)
+    :ok = Imessaged.send_file_to_chat(att.filepath, "iMessage;+;" <> chat_id)
 
     send_response_attachments(msg, atts)
   end
