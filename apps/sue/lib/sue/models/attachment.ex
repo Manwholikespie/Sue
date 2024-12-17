@@ -2,6 +2,7 @@ defmodule Sue.Models.Attachment do
   alias __MODULE__
 
   defstruct [
+    # imessage id is integer
     :id,
     :filepath,
     :mime_type,
@@ -28,7 +29,8 @@ defmodule Sue.Models.Attachment do
       ) do
     %Attachment{
       id: aid,
-      filepath: filename,
+      # despite being called filename, it's actually a relative path to ~/Library/Messages/...
+      filepath: Sue.Utils.resolve_filepath(filename),
       mime_type: mime_type,
       fsize: fsize,
       resolved: true,

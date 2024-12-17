@@ -38,6 +38,8 @@ defmodule Sue.MixProject do
   defp deps do
     [
       {:subaru, in_umbrella: true},
+      # until I reach a stable release
+      {:imessaged, git: "https://github.com/Manwholikespie/imessaged"},
       {:timex, "~> 3.0"},
       {:logger_file_backend, "~> 0.0.10"},
       {:phoenix_pubsub, "~> 2.0"},

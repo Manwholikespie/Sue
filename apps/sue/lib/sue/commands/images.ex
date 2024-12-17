@@ -47,7 +47,7 @@ defmodule Sue.Commands.Images do
   def c_motivate(%Message{has_attachments: true, attachments: [att | _]} = msg) do
     # only process the first attachment.
     with {:ok, att} <- Attachment.resolve(msg, att) do
-      path = resolve_filepath(att.filepath)
+      path = Sue.Utils.resolve_filepath(att.filepath)
 
       {top_text, bot_text} =
         case String.split(msg.args, ~r{,}, parts: 2, trim: true) |> Enum.map(&String.trim/1) do
@@ -88,13 +88,5 @@ defmodule Sue.Commands.Images do
     |> (fn image ->
           %Attachment{filepath: Path.join(path, image)}
         end).()
-  end
-
-  defp resolve_filepath(maybe_path) do
-    if String.starts_with?(maybe_path, "~") do
-      Path.expand(maybe_path)
-    else
-      Path.absname(maybe_path)
-    end
   end
 end

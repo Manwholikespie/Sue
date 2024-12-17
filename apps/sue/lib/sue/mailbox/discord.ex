@@ -7,7 +7,7 @@ defmodule Sue.Mailbox.Discord do
   alias Nostrum.Api
 
   def start_link() do
-    Consumer.start_link(__MODULE__)
+    Nostrum.Consumer.start_link(__MODULE__)
   end
 
   def handle_event({:MESSAGE_CREATE, dmsg, _ws_state}) do
