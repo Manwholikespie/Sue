@@ -59,7 +59,7 @@ config :logger, :error_log,
 
 config :tesla,
   log_level: :warn,
-  adapter: Tesla.Adapter.Mint
+  adapter: {Tesla.Adapter.Mint, [protocol: :http1]}
 
 config :tesla, Tesla.Middleware.Logger,
   log_level: :warn,

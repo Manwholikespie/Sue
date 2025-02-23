@@ -71,8 +71,12 @@ defmodule Sue.Mailbox.Telegram do
 
   def send_response_text(msg, rsp) do
     {_platform, id} = msg.chat.platform_id
-    ExGram.send_message(id, rsp.body)
-    :ok
+    case ExGram.send_message(id, rsp.body) do
+      {:ok, _} -> :ok
+      {:error, error} ->
+        Logger.error("Failed to send message: #{inspect(error)}")
+        :error
+    end
   end
 
   def send_response_attachments(_msg, []), do: :ok
