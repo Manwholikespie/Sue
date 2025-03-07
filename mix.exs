@@ -13,12 +13,21 @@ defmodule Sue.Umbrella.MixProject do
           applications: [sue: :permanent, subaru: :permanent],
           strip_beams: [keep: ["Docs"]]
         ]
+      ],
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        plt_add_apps: [:mix, :ex_unit],
+        plt_add_deps: :app_tree,
+        ignore_warnings: ".dialyzer_ignore.exs",
+        list_unused_filters: true
       ]
     ]
   end
 
   defp deps do
-    []
+    [
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+    ]
   end
 
   defp aliases do

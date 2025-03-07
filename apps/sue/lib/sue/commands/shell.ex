@@ -3,11 +3,11 @@ defmodule Sue.Commands.Shell do
   @is_persisted "is persisted"
   alias Sue.Models.{Response, Message, Account}
 
-  @doc """
-  A struct that implements Collectable to be akin to redirecting output to /dev/null.
-  https://elixirforum.com/t/how-to-use-system-cmd-s-into-option-with-dev-null/37444/2
-  """
   defmodule DevNull do
+    @moduledoc """
+    A struct that implements Collectable to be akin to redirecting output to /dev/null.
+    https://elixirforum.com/t/how-to-use-system-cmd-s-into-option-with-dev-null/37444/2
+    """
     defstruct []
 
     defimpl Collectable do

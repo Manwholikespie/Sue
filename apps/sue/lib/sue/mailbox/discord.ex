@@ -1,14 +1,11 @@
 defmodule Sue.Mailbox.Discord do
+  # We don't need a start_link, due to the way they've set up their __using__ macro.
   use Nostrum.Consumer
 
   require Logger
 
   alias Sue.Models.{Message, Response}
   alias Nostrum.Api
-
-  def start_link() do
-    Nostrum.Consumer.start_link(__MODULE__)
-  end
 
   def handle_event({:MESSAGE_CREATE, dmsg, _ws_state}) do
     msg = Message.from_discord(dmsg)

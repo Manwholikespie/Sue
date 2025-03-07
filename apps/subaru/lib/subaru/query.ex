@@ -41,34 +41,33 @@ defmodule Subaru.Query do
           | {:has, map(), bitstring()}
 
   # TODO: Someday I'll get around to implementing all of these.
-  """
-  Boolean:
-    HAS()
-    IS_SAME_COLLECTION()
+  # (Or not, now that Arango has dropped support for MacOS.)
+  # Boolean:
+  #   HAS()
+  #   IS_SAME_COLLECTION()
 
-  Number:
-    COUNT()
-    LENGTH()
-    MATCHES() (if returnIndex is enabled)
+  # Number:
+  #   COUNT()
+  #   LENGTH()
+  #   MATCHES() (if returnIndex is enabled)
 
-  Array:
-    ATTRIBUTES()
-    VALUES()
+  # Array:
+  #   ATTRIBUTES()
+  #   VALUES()
 
-  Object:
-    KEEP()
-    KEEP_RECURSIVE()
-    MERGE()
-    MERGE_RECURSIVE()
-    PARSE_IDENTIFIER()
-    UNSET()
-    UNSET_RECURSIVE()
-    ZIP()
+  # Object:
+  #   KEEP()
+  #   KEEP_RECURSIVE()
+  #   MERGE()
+  #   MERGE_RECURSIVE()
+  #   PARSE_IDENTIFIER()
+  #   UNSET()
+  #   UNSET_RECURSIVE()
+  #   ZIP()
 
-  Any:
-    TRANSLATE()
-    VALUE()
-  """
+  # Any:
+  #   TRANSLATE()
+  #   VALUE()
 
   @spec new :: Query.t()
   def new() do

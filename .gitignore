@@ -34,3 +34,7 @@ sue-*.tar
 
 # API keys, etc.
 /config/*.secret.exs
+
+# Dialyzer PLT files
+/priv/plts/*.plt
+/priv/plts/*.plt.hash
