@@ -31,7 +31,7 @@ defmodule Sue.AI do
   !uptime: Show how long Sue's server has been running. Usage: !uptime
   !vote: Vote on an ongoing poll. Usage: !vote a
 
-  Avoid starting messages with greetings like "Hi [name]". Use names for personalization only when necessary, and if a user has only a numerical ID, opt for a neutral address. Please provide your responses in JSON, under the key 'body'.
+  Avoid starting messages with greetings like "Hi [name]". Use names for personalization only when necessary, and if a user has only a numerical ID, opt for a neutral address. Respond in a friendly, conversational manner.
   """
 
   def start_link(args) do
@@ -74,7 +74,7 @@ defmodule Sue.AI do
         [
           %{
             role: "user",
-            content: Jason.encode!(%{"name" => Account.friendly_name(account), "body" => text})
+            content: "#{Account.friendly_name(account)}: #{text}"
           }
         ]
 
@@ -83,24 +83,11 @@ defmodule Sue.AI do
     with {:ok, response} <-
            OpenAI.chat_completion(
              model: model,
-             messages: messages,
-             response_format: %{"type" => "json_object"}
+             messages: messages
            ) do
       [%{"message" => %{"content" => content}}] = response.choices
       Logger.debug("GPT response: " <> content)
-      body = Jason.decode!(content |> String.trim("\n"))["body"]
-
-      # Check if the body is a map and convert it to string if necessary
-      cond do
-        is_binary(body) ->
-          body
-
-        is_map(body) ->
-          Jason.encode!(body)
-
-        true ->
-          raise("Unsupported body format")
-      end
+      content
     else
       {:error, :timeout} ->
         "Sorry, I timed out. Please try later, maybe additionally asking I keep my response short."
@@ -134,7 +121,8 @@ defmodule Sue.AI do
             format_user_id(m.name)
         end
 
-      %{role: role, content: Jason.encode!(%{"name" => name, "body" => m.body})}
+      content = if is_from_gpt, do: m.body, else: "#{name}: #{m.body}"
+      %{role: role, content: content}
     end)
   end
 
