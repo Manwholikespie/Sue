@@ -57,19 +57,6 @@ config :logger, :error_log,
   path: Path.join(logger_dir, "error.log"),
   level: :error
 
-config :tesla,
-  log_level: :warn,
-  adapter: Tesla.Adapter.Mint
-
-config :tesla, Tesla.Middleware.Logger,
-  log_level: :warn,
-  debug: false
-
-Logger.put_module_level(Tesla, :warn)
-Logger.put_module_level(Tesla.Middleware.Logger, :warn)
-Logger.put_module_level(ExGram.Adapter.Tesla, :warn)
-Logger.put_module_level(Tesla, :warn)
-
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
@@ -84,6 +71,9 @@ config :sue,
   cmd_rate_limit: {:timer.seconds(5), 5},
   gpt_rate_limit: {:timer.hours(24), 50},
   sd_rate_limit: {:timer.hours(24), 17}
+
+config :telegex,
+  caller_adapter: {Finch, [receive_timeout: 5 * 1000]}
 
 config :subaru,
   dbname: "subaru_#{config_env()}"

@@ -24,7 +24,7 @@ defmodule Sue.MixProject do
     [
       mod: {Sue.Application, []},
       included_applications: [:nostrum],
-      extra_applications: [:logger, :runtime_tools, :mint, :eex]
+      extra_applications: [:logger, :runtime_tools, :finch, :multipart, :eex]
     ]
   end
 
@@ -43,13 +43,13 @@ defmodule Sue.MixProject do
       {:timex, "~> 3.0"},
       {:logger_file_backend, "~> 0.0.10"},
       {:phoenix_pubsub, "~> 2.0"},
-      # telegram
-      {:ex_gram, git: "https://github.com/rockneurotiko/ex_gram"},
-      {:tesla, git: "https://github.com/teamon/tesla", override: true},
+      # telegram - start
+      {:telegex, "~> 1.9.0-rc.0"},
+      {:finch, "~> 0.19"},
+      {:multipart, "~> 0.1.0"},
+      # telegram - end
       {:jason, "~> 1.2"},
       {:hammer, "~> 6.1"},
-      {:castore, "~> 0.1.0"},
-      {:mint, "~> 1.1"},
       {:exqlite, "~> 0.13"},
       {:openai, "~> 0.5.2"},
       {:replicate, "~> 1.1.0"},
@@ -57,7 +57,7 @@ defmodule Sue.MixProject do
       {:nostrum, git: "https://github.com/Kraigie/nostrum", runtime: false},
       {:cowlib, "~> 2.11", [env: :prod, hex: "remedy_cowlib", override: true, repo: "hexpm"]},
       {:gun, "2.0.1", [env: :prod, hex: "remedy_gun", override: true, repo: "hexpm"]},
-      {:mime, "~> 2.0"},
+      {:mime, "~> 1.2"},
       # imagemagick
       {:mogrify, "~> 0.8.0"}
     ]

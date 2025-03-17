@@ -27,7 +27,7 @@
   # Communication/Mailbox warnings
   {"lib/sue/mailbox/discord.ex", :unknown_function},
   {"lib/sue/mailbox/i_message.ex", :no_return},
-  {"lib/sue/mailbox/telegram.ex", :callback_type_mismatch},
+  {"lib/sue/mailbox/telegram.ex", :no_return},
 
   # Model-related warnings
   {"lib/sue/models/account.ex", :no_return},
@@ -36,6 +36,5 @@
   {"lib/sue/models/message.ex", :pattern_match},
   {"lib/sue/models/message.ex", :unused_fun},
   {"lib/sue/models/message.ex", :pattern_match_cov},
-  {"lib/sue/models/message.ex", :unknown_type},
   {"lib/sue/models/poll.ex", :unknown_type}
 ]

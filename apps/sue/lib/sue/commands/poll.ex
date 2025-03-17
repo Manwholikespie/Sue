@@ -86,7 +86,7 @@ defmodule Sue.Commands.Poll do
       %Response{body: poll_text(poll)}
     else
       # Use Telegram's custom interface.
-      ExGram.send_poll(chat.id, poll.topic, poll.options, is_anonymous: false)
+      Telegex.send_poll(chat.id, poll.topic, poll.options, is_anonymous: false)
       %Response{}
     end
   end

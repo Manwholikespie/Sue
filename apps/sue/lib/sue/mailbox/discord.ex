@@ -4,8 +4,11 @@ defmodule Sue.Mailbox.Discord do
 
   require Logger
 
+  alias Sue.Models.Attachment
   alias Sue.Models.{Message, Response}
   alias Nostrum.Api
+
+  import Nostrum.Struct.Embed
 
   def handle_event({:MESSAGE_CREATE, dmsg, _ws_state}) do
     msg = Message.from_discord(dmsg)
@@ -43,10 +46,32 @@ defmodule Sue.Mailbox.Discord do
     end
   end
 
+  @spec send_response_attachments(Message.t(), [Attachment.t()]) :: :ok
   def send_response_attachments(_, []), do: :ok
 
-  def send_response_attachments(msg, [att | atts]) do
-    Api.create_message(msg.metadata.channel_id, file: att.filepath)
+  def send_response_attachments(msg, [att = %Attachment{} | atts]) do
+    Logger.debug(att |> inspect())
+
+    filepath =
+      if Attachment.has_url?(att) do
+        {:ok, %Attachment{filepath: fp}} = Attachment.download(att)
+        fp
+      else
+        att.filepath
+      end
+
+    Api.create_message(msg.metadata.channel_id, file: filepath)
+
     send_response_attachments(msg, atts)
+  end
+
+  @spec send_response_embed(Message.t(), bitstring()) :: :ok
+  def send_response_embed(msg, url) do
+    embed =
+      %Nostrum.Struct.Embed{}
+      |> put_image(url)
+
+    {:ok, _message} = Api.create_message(msg.metadata.channel_id, embeds: [embed])
+    :ok
   end
 end

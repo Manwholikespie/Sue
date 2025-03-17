@@ -6,7 +6,6 @@ defmodule Sue.Application do
 
   @platforms Application.compile_env(:sue, :platforms, [])
   @chat_db_path Application.compile_env(:sue, :chat_db_path)
-  @ex_gram_token Application.compile_env(:ex_gram, :token)
 
   def start(_type, _args) do
     children = [
@@ -29,10 +28,7 @@ defmodule Sue.Application do
 
     children_telegram =
       if Sue.Utils.contains?(@platforms, :telegram) do
-        [
-          ExGram,
-          {Sue.Mailbox.Telegram, [method: :polling, token: @ex_gram_token]}
-        ]
+        [Sue.Mailbox.Telegram]
       else
         []
       end

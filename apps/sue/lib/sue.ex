@@ -202,24 +202,4 @@ defmodule Sue do
   end
 
   defp make_func_doc_tuple(_, _, _), do: []
-
-  def post_init() do
-    # Set Telegram method descriptions.
-    for {_module, fname, doc} <- get_commands() |> Map.values() do
-      desc = doc |> String.split("\n", parts: 2) |> hd()
-
-      desc =
-        if String.length(desc) >= 3 do
-          desc
-        else
-          "No description yet."
-        end
-
-      %ExGram.Model.BotCommand{
-        command: fname,
-        description: desc
-      }
-    end
-    |> ExGram.set_my_commands()
-  end
 end
