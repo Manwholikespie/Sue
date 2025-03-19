@@ -2,6 +2,7 @@ defmodule Sue.Commands.Poll do
   Module.register_attribute(__MODULE__, :is_persisted, persist: true)
   @is_persisted "is persisted"
 
+  require Logger
   alias Sue.Models.{Message, Response, Poll}
   alias Sue.DB
 
@@ -25,30 +26,35 @@ defmodule Sue.Commands.Poll do
   Vote on an ongoing poll
   Usage: !vote a
   """
+  def c_vote(%Message{args: ""}),
+    do: %Response{body: "Please specify an option to vote for. Example: !vote a"}
+
   def c_vote(msg) do
     # Before voting on a poll, first confirm one exists for the current chat.
 
-    case DB.find_poll(msg.chat) do
-      {:ok, %Poll{interface: :platform}} ->
-        %Response{body: "Please use this messenger's custom polling interface."}
+    with {:ok, poll} <- DB.find_poll(msg.chat) do
+      case poll do
+        %Poll{interface: :platform} ->
+          %Response{body: "Please use this messenger's custom polling interface."}
 
-      {:ok, %Poll{}} ->
-        vote(msg)
-
-      {:ok, :dne} ->
-        %Response{body: "A poll does not exist for this chat."}
+        p ->
+          vote(poll, msg)
+      end
+    else
+      {:error, :dne} -> %Response{body: "A poll does not exist for this chat."}
     end
   end
 
-  def vote(msg) do
-    args = String.downcase(msg.args)
-
-    if String.match?(args, ~r/^[a-z]$/) do
-      case DB.add_poll_vote(msg.chat, msg.account, alpha_to_idx(args)) do
-        {:ok, newpoll} -> poll_to_response(newpoll, msg)
-      end
+  @spec vote(Poll.t(), Message.t()) :: Response.t()
+  def vote(poll, msg) do
+    with args <- String.downcase(msg.args),
+         true <- String.match?(args, ~r/^[a-z]$/),
+         idx <- alpha_to_idx(args),
+         true <- idx < length(poll.options) do
+      {:ok, newpoll} = DB.add_poll_vote(msg.chat.id, msg.account.id, idx)
+      poll_to_response(newpoll, msg)
     else
-      %Response{body: "Not an option in this poll. See: !help vote"}
+      _ -> %Response{body: "Not an option in this poll. See: !help vote"}
     end
   end
 
@@ -80,18 +86,19 @@ defmodule Sue.Commands.Poll do
     %Response{body: "Please limit to 26 options or less."}
   end
 
+  @spec poll_to_response(Poll.t(), Message.t()) :: Response.t()
   defp poll_to_response(poll, %Message{platform: :telegram, chat: chat}) do
     if length(poll.options) > 10 do
       # Resort to typical poll interface
       %Response{body: poll_text(poll)}
     else
       # Use Telegram's custom interface.
-      Telegex.send_poll(chat.id, poll.topic, poll.options, is_anonymous: false)
+      {_, chatid} = chat.platform_id
+      {:ok, _} = Telegex.send_poll(chatid, poll.topic, poll.options, is_anonymous: false)
       %Response{}
     end
   end
 
-  @spec poll_to_response(Poll.t(), Message.t()) :: Response.t()
   defp poll_to_response(poll, _msg), do: %Response{body: poll_text(poll)}
 
   defp poll_text(%Poll{votes: votes} = poll) when map_size(votes) == 0 do

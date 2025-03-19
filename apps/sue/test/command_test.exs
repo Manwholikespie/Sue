@@ -45,7 +45,7 @@ defmodule CommandTest do
 
     m = Message.from_debug("!poll topic, option1, option2")
     r = Sue.debug_blocking_process_message(m)
-    assert String.contains?(r.body, "option1")
+    assert String.contains?(r.body, "option2")
 
     m = Message.from_debug("!vote a")
     r = Sue.debug_blocking_process_message(m)
@@ -54,6 +54,10 @@ defmodule CommandTest do
     m = Message.from_debug("!vote b")
     r = Sue.debug_blocking_process_message(m)
     assert String.contains?(r.body, "(1) b.")
+
+    m = Message.from_debug("!poll topic, option1, option2, option3")
+    r = Sue.debug_blocking_process_message(m)
+    assert String.contains?(r.body, "option3")
   end
 
   test "ratelimit" do

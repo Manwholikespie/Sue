@@ -64,6 +64,7 @@ config :hammer,
   backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 25, cleanup_interval_ms: 60_000 * 10]}
 
 config :sue,
+  query_debug: false,
   # options include :discord, :imessage, :telegram - :debug is just for testing
   platforms: [:debug, :discord, :imessage, :telegram],
   chat_db_path: Path.join(System.user_home(), "Library/Messages/chat.db"),

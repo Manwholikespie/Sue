@@ -23,6 +23,7 @@ defmodule Subaru do
 
   @doc """
   Upserts and returns the ID to the document.
+  If return_doc is true, returns the entire document instead of just the ID.
   """
   @spec upsert(map(), map(), map(), bitstring()) :: res_id()
   def upsert(d_search, d_insert, d_update, collection, return_doc \\ false) do
@@ -36,15 +37,39 @@ defmodule Subaru do
   end
 
   @doc """
-  Upserts and returns the new document.
+  Similar to upsert, but uses REPLACE instead of UPDATE.
+
+  This completely replaces documents rather than updating fields. Any fields not specified
+  in the replacement document will be removed.
+
+  If return_doc is true, returns the entire document instead of just the ID.
+
+  ## Parameters
+
+  - `d_search`: The document to search for.
+  - `d_insert`: The document to insert if no match is found.
+  - `d_replace`: The document that will completely replace the existing doc if found.
+  - `collection`: The name of the collection to operate on.
+  - `return_doc`: Boolean flag to return the full document instead of just the ID.
+
+  ## Example
+
+      Subaru.repsert(
+        %{email: "user@example.com"},
+        %{email: "user@example.com", name: "New User", active: true},
+        %{email: "user@example.com", name: "Existing User", active: false},
+        "users"
+      )
   """
-  @spec upsert_return(map(), map(), map(), bitstring()) :: any()
-  def upsert_return(d_search, d_insert, d_update, collection) do
-    Query.new()
-    |> Query.upsert(d_search, d_insert, d_update, collection)
-    |> Query.return("NEW")
-    |> Query.exec()
-    |> result_one()
+  @spec repsert(map(), map(), map(), bitstring(), boolean()) :: res_id()
+  def repsert(d_search, d_insert, d_replace, collection, return_doc \\ false) do
+    res =
+      Query.new()
+      |> Query.repsert(d_search, d_insert, d_replace, collection)
+      |> Query.return(if return_doc, do: "NEW", else: "NEW._id")
+      |> Query.exec()
+
+    if return_doc, do: result_one(res), else: result_id(res)
   end
 
   @spec insert(map(), bitstring()) :: res_id()

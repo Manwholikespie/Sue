@@ -117,7 +117,7 @@ defmodule DBTest do
     p = Poll.new(c, "Best movie?", ["TRON Legacy", "Wild Tales", "Whiplash"], :standard)
 
     {:ok, _poll_id} = DB.add_poll(p, c.id)
-    {:ok, _new_poll} = DB.add_poll_vote(c, a, 0)
+    {:ok, _new_poll} = DB.add_poll_vote(c.id, a.id, 0)
 
     assert true
   end
