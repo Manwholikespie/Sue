@@ -107,6 +107,32 @@ defmodule Subaru.Query do
   end
 
   @doc """
+  Similar to upsert, but uses REPLACE instead of UPDATE to completely replace documents rather than update fields.
+
+  ## Parameters
+
+  - `q`: The Query struct, representing the current state of the query being built.
+  - `searchdoc`: The document to search for.
+  - `insertdoc`: The document to insert if no match is found.
+  - `replacedoc`: The document that will completely replace the existing doc if found.
+  - `collection`: The name of the collection to operate on.
+
+  ## Example
+
+      Query.new()
+      |> Query.repsert(%{name: "user1"}, %{name: "user1", active: true}, %{name: "user1", active: false}, "users")
+      |> Query.exec()
+
+  This will replace any document with name "user1" with the new document containing only name and active fields.
+  Any other fields in the original document will be removed.
+  """
+  @spec repsert(t, any(), any(), any(), bitstring()) :: t
+  def repsert(q, searchdoc, insertdoc, replacedoc, collection) do
+    item = {:repsert, searchdoc, insertdoc, replacedoc, collection}
+    push(q, item)
+  end
+
+  @doc """
   Updates a document in a specified collection with given key expression and new document data.
 
   ## Parameters
@@ -323,6 +349,24 @@ defmodule Subaru.Query do
     |> add_bindvar(bv_sdoc, searchdoc)
     |> add_bindvar(bv_idoc, insertdoc)
     |> add_bindvar(bv_udoc, updatedoc)
+    |> add_bindvar(bv_coll, collection)
+    |> add_write_coll(collection)
+    |> gen()
+  end
+
+  defp gen({:repsert, searchdoc, insertdoc, replacedoc, collection}, query) do
+    bv_sdoc = generate_bindvar(searchdoc)
+    bv_idoc = generate_bindvar(insertdoc)
+    bv_rdoc = generate_bindvar(replacedoc)
+    bv_coll = "@" <> generate_bindvar(collection)
+
+    statement = "UPSERT #{bv_sdoc} INSERT #{bv_idoc} REPLACE #{bv_rdoc} IN #{bv_coll}"
+
+    query
+    |> add_statement(statement)
+    |> add_bindvar(bv_sdoc, searchdoc)
+    |> add_bindvar(bv_idoc, insertdoc)
+    |> add_bindvar(bv_rdoc, replacedoc)
     |> add_bindvar(bv_coll, collection)
     |> add_write_coll(collection)
     |> gen()

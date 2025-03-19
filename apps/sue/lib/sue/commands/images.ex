@@ -43,34 +43,44 @@ defmodule Sue.Commands.Images do
     %Response{body: "Please include an image with your message. See !help motivate"}
   end
 
-  # TODO: verify this even works for discord
   def c_motivate(%Message{has_attachments: true, attachments: [att | _]} = msg) do
-    # only process the first attachment.
-    with {:ok, att} <- Attachment.resolve(msg, att) do
-      path = Sue.Utils.resolve_filepath(att.filepath)
-
-      {top_text, bot_text} =
-        case String.split(msg.args, ~r{,}, parts: 2, trim: true) |> Enum.map(&String.trim/1) do
-          [] -> {nil, nil}
-          [top] -> {top, ""}
-          [top, bot] -> {top, bot}
-        end
-
-      motivate_helper(path, top_text, bot_text)
+    with {:ok, att} <- Attachment.download(att),
+         :ok <- validate_image(att),
+         {:ok, caption} <- parse_caption(msg.args) do
+      motivate_helper(att.filepath, elem(caption, 0), elem(caption, 1))
     else
       {:error, :not_image} ->
         %Response{body: "!motivate only supports images right now, sorry :("}
 
       {:error, :too_big} ->
         %Response{body: "Media is too large. Please try again with a smaller file."}
+
+      {:error, :missing_caption} ->
+        %Response{
+          body:
+            "Please provide a caption in the form of: !motivate top text, bottom text. The bottom text is optional."
+        }
+
+      {:error, %Attachment{} = att} ->
+        %Response{body: "There was an issue with the attachment: #{inspect(att.errors)}"}
     end
   end
 
-  defp motivate_helper(_path, nil, nil) do
-    %Response{
-      body:
-        "Please provide a caption in the form of: !motivate top text, bottom text. The bottom text is optional."
-    }
+  defp validate_image(%Attachment{errors: []} = att) do
+    if Attachment.is_image?(att), do: :ok, else: {:error, :not_image}
+  end
+
+  defp validate_image(%Attachment{errors: [{:size, _} | _]}), do: {:error, :too_big}
+  defp validate_image(_), do: {:error, :not_image}
+
+  defp parse_caption(""), do: {:error, :missing_caption}
+
+  defp parse_caption(args) do
+    case String.split(args, ~r{,}, parts: 2, trim: true) |> Enum.map(&String.trim/1) do
+      [] -> {:error, :missing_caption}
+      [top] -> {:ok, {top, ""}}
+      [top, bot] -> {:ok, {top, bot}}
+    end
   end
 
   defp motivate_helper(path, top_text, bot_text) do
@@ -78,7 +88,7 @@ defmodule Sue.Commands.Images do
     %Attachment{filepath: outpath}
   end
 
-  @spec random_image_from_dir(bitstring()) :: Attachment.t()
+  @spec random_image_from_dir(bitstring()) :: %Attachment{}
   defp random_image_from_dir(dir) do
     path = Path.join(@media_path, dir)
 

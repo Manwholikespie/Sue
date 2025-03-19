@@ -72,7 +72,8 @@ defmodule Sue.Mailbox.IMessage do
   defp send_response_attachments(%Message{chat: %Chat{is_direct: true}} = msg, [att | atts]) do
     {_platform, account_id} = msg.paccount.platform_id
 
-    :ok = Imessaged.send_file_to_buddy(att.filepath, account_id)
+    {:ok, %Attachment{filepath: filepath}} = Attachment.download(att)
+    :ok = Imessaged.send_file_to_buddy(filepath, account_id)
 
     send_response_attachments(msg, atts)
   end
@@ -80,7 +81,8 @@ defmodule Sue.Mailbox.IMessage do
   defp send_response_attachments(%Message{chat: %Chat{is_direct: false}} = msg, [att | atts]) do
     {_platform, "chat" <> _ = chat_id} = msg.chat.platform_id
 
-    :ok = Imessaged.send_file_to_chat(att.filepath, "iMessage;+;" <> chat_id)
+    {:ok, %Attachment{filepath: filepath}} = Attachment.download(att)
+    :ok = Imessaged.send_file_to_chat(filepath, "iMessage;+;" <> chat_id)
 
     send_response_attachments(msg, atts)
   end

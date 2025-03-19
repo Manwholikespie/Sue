@@ -113,22 +113,12 @@ defmodule Sue.Models.Message do
     |> add_account_and_chat_to_graph()
   end
 
-  @spec from_telegram(Map.t()) :: t
-  def from_telegram(%{msg: msg, context: context} = update) do
+  def from_telegram2(msg) do
     {command, args, body} =
-      case Map.get(update, :command) do
-        nil ->
-          command_args_from_body(:telegram, Map.get(msg, :caption, Map.get(msg, :text, "")))
-
-        c ->
-          {c, msg.text, context.update.message.text}
-      end
+      command_args_from_body(:telegram, msg.text || msg.caption || "")
 
     command =
-      parse_command_potentially_with_botname_suffix(
-        command,
-        "@" <> context.bot_info.username
-      )
+      parse_command_potentially_with_botname_suffix(command)
 
     paccount =
       %PlatformAccount{platform_id: {:telegram, msg.from.id}}
@@ -145,7 +135,7 @@ defmodule Sue.Models.Message do
 
     %Message{
       platform: :telegram,
-      id: msg.chat.id,
+      id: "#{msg.chat.id}.#{msg.message_id}",
       #
       paccount: paccount,
       chat: chat,
@@ -243,10 +233,13 @@ defmodule Sue.Models.Message do
     |> add_account_and_chat_to_graph()
   end
 
-  # TODO: Move this inside the Attachments module. No clue why it's here.
-  def construct_attachments(%Message{has_attachments: false} = msg, _), do: msg
+  @spec construct_attachments(t(), any()) :: t()
+  defp construct_attachments(%Message{has_attachments: false} = msg, _), do: msg
 
-  def construct_attachments(%Message{platform: :telegram} = msg, data) do
+  # NOTE: Because Telegram does not offer a way to distinguish between a photo
+  # and a smaller size of another photo, we only allow sending one photo at a time as
+  # a command arg (Process only the largest image).
+  defp construct_attachments(%Message{platform: :telegram} = msg, data) do
     list_of_atts =
       Map.get(data, :photo) ||
         Map.get(data, :document) ||
@@ -260,6 +253,7 @@ defmodule Sue.Models.Message do
         list_of_atts
       end
       |> Enum.sort_by(fn a -> a.file_size end, :desc)
+      |> Enum.take(1)
 
     %Message{
       msg
@@ -269,25 +263,26 @@ defmodule Sue.Models.Message do
     }
   end
 
-  def construct_attachments(%Message{platform: :discord} = msg, attachments) do
+  defp construct_attachments(%Message{platform: :discord} = msg, attachments) do
     %Message{
       msg
       | attachments:
           for a <- attachments do
             %Attachment{
               id: a.id,
+              url: a.url,
               filepath: a.filename,
               mime_type: MIME.from_path(a.filename),
               fsize: a.size,
-              metadata: %{url: a.url, height: a.height, width: a.width},
-              resolved: false
+              downloaded: false,
+              metadata: %{url: a.url, height: a.height, width: a.width}
             }
           end
     }
   end
 
   @spec add_account_and_chat_to_graph(t()) :: t
-  def add_account_and_chat_to_graph(%Message{account: a, chat: c} = msg) do
+  defp add_account_and_chat_to_graph(%Message{account: a, chat: c} = msg) do
     {:ok, _dbid} = DB.add_user_chat_edge(a, c)
     msg
   end
@@ -307,13 +302,13 @@ defmodule Sue.Models.Message do
     end
   end
 
-  defp parse_command_potentially_with_botname_suffix(command, botname_suffix) do
-    cond do
-      String.ends_with?(command, botname_suffix) ->
-        String.slice(command, 0, String.length(command) - String.length(botname_suffix))
-
-      true ->
-        command
+  # Previously, I would trim according to a trailing @BotName on the command. Now, I just trim
+  # everything after a found @
+  defp parse_command_potentially_with_botname_suffix(command) do
+    if String.contains?(command, "@") do
+      String.split(command, "@", parts: 2) |> hd()
+    else
+      command
     end
   end
 

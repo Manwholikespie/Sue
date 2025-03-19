@@ -198,36 +198,57 @@ defmodule Sue.DB do
   # ===========
   # || POLLS ||
   # ===========
+  @doc """
+  Adds a poll to a chat.
+
+  This function creates a new poll or replaces an existing one for a given chat.
+  It establishes an edge between the chat and the poll in the graph database.
+
+  ## Parameters
+
+  - `poll`: A `Poll.t()` struct containing the poll data
+  - `chat_id`: The database ID of the chat to which the poll belongs
+
+  ## Returns
+
+  - `{:ok, Poll.t()}`: The newly created or updated poll
+
+  ## Examples
+
+      {:ok, poll} = Sue.DB.add_poll(%Poll{title: "Lunch options", choices: ["Pizza", "Salad"]}, chat_id)
+  """
   @spec add_poll(Poll.t(), Subaru.dbid()) :: {:ok, Poll.t()}
   def add_poll(%Poll{chat_id: chat_id} = poll, chat_id) when is_dbid(chat_id) do
     polldoc = Poll.doc(poll)
     pollcol = Poll.collection()
 
     d_search = %{chat_id: chat_id}
-    {:ok, newpoll} = Subaru.upsert_return(d_search, polldoc, %{}, pollcol)
+    {:ok, newpoll} = Subaru.repsert(d_search, polldoc, polldoc, pollcol, true)
     {:ok, _} = Subaru.upsert_edge(chat_id, newpoll["_id"], Schema.ecoll_sue_poll_by_chat())
 
     {:ok, Poll.from_doc(newpoll)}
   end
 
-  @spec find_poll(Chat.t()) :: {:ok, Poll.t()} | {:ok, :dne}
+  @spec find_poll(Chat.t()) :: {:ok, Poll.t()} | {:error, :dne}
   def find_poll(chat) do
     case Subaru.find_one(Poll.collection(), {:==, "x.chat_id", chat.id}) do
       {:ok, doc} when is_map(doc) -> {:ok, Poll.from_doc(doc)}
-      {:ok, :dne} -> {:ok, :dne}
+      {:ok, :dne} -> {:error, :dne}
     end
   end
 
-  @spec add_poll_vote(Chat.t(), Account.t(), integer()) :: {:ok, Poll.t()}
-  def add_poll_vote(chat, account, choice_idx) do
-    d_search = %{chat_id: chat.id}
+  @spec add_poll_vote(Subaru.dbid(), Subaru.dbid(), integer()) :: {:ok, Poll.t()}
+  def add_poll_vote(chat_id, account_id, choice_idx)
+      when is_dbid(chat_id) and is_dbid(account_id) and is_integer(choice_idx) do
+    d_search = %{chat_id: chat_id}
 
     {:ok, newpoll} =
-      Subaru.upsert_return(
+      Subaru.upsert(
         d_search,
         %{},
-        %{votes: %{account.id => choice_idx}},
-        Poll.collection()
+        %{votes: %{account_id => choice_idx}},
+        Poll.collection(),
+        true
       )
 
     {:ok, Poll.from_doc(newpoll)}

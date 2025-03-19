@@ -1,51 +1,27 @@
 defmodule Sue.Mailbox.Telegram do
-  @bot :sue
-  @pretty_debug false
+  use Telegex.Polling.GenHandler
 
   require Logger
 
-  alias Sue.Models.{Message, Response}
+  alias Sue.Models.{Message, Response, Attachment}
 
-  use ExGram.Bot,
-    name: @bot
+  @impl true
+  def on_boot() do
+    # delete any potential webhook
+    {:ok, true} = Telegex.delete_webhook()
 
-  def bot(), do: @bot
-
-  def handle({:command, command, msg}, context) do
-    Logger.debug("=== begin :command handle ===")
-    Logger.debug("command: #{command |> inspect(pretty: @pretty_debug)}")
-    Logger.debug("msg: #{msg |> inspect(pretty: @pretty_debug)}")
-    Logger.debug("context: #{context |> inspect(pretty: @pretty_debug)}")
-    Logger.debug("=== end :command handle ===")
-
-    msg = Message.from_telegram(%{msg: msg, command: command, context: context})
-    Sue.process_messages([msg])
-    context
+    # create configuration (can be empty, because there are default values)
+    # allowed_updates = ["message"]
+    %Telegex.Polling.Config{allowed_updates: []}
   end
 
-  def handle({:message, msg}, context) do
-    Logger.debug("=== begin :message handle ===")
-    Logger.debug("msg: #{msg |> inspect(pretty: @pretty_debug)}")
-    Logger.debug("context: #{context |> inspect(pretty: @pretty_debug)}")
-    Logger.debug("=== end :message handle ===")
-    # Logger.info("msg: #{inspect(msg)}\n\ncontext: #{inspect(context)}")
-    msg = Message.from_telegram(%{msg: msg, context: context})
-    Sue.process_messages([msg])
-    context
-  end
+  @impl true
+  def on_update(update) do
+    # consume the update
+    Logger.debug(update |> inspect(pretty: true, limit: :infinity))
+    message = Message.from_telegram2(update.message)
+    Sue.process_messages([message])
 
-  def handle({:text, _text, msg}, context) do
-    # Direct text or reply in group
-    Logger.debug("=== begin :text handle ===")
-    item = %{msg: msg, context: context}
-    Logger.debug(item |> inspect())
-    Sue.process_messages([Message.from_telegram(item)])
-    Logger.debug("=== end :text handle ===")
-    :ok
-  end
-
-  def handle({:update, _update}, _context) do
-    # Poll responses
     :ok
   end
 
@@ -69,17 +45,37 @@ defmodule Sue.Mailbox.Telegram do
     send_response_attachments(msg, atts)
   end
 
+  # TODO: REPLACE
+  @spec send_response_text(Message.t(), Response.t()) :: :ok
   def send_response_text(msg, rsp) do
     {_platform, id} = msg.chat.platform_id
-    ExGram.send_message(id, rsp.body)
+    Telegex.send_message(id, rsp.body)
     :ok
   end
 
   def send_response_attachments(_msg, []), do: :ok
 
+  # TODO: REPLACE
   def send_response_attachments(msg, [att | atts]) do
     {_platform, id} = msg.chat.platform_id
-    ExGram.send_photo(id, {:file, att.filepath})
+
+    if Attachment.has_url?(att) do
+      Telegex.send_photo(id, att.url)
+    else
+      url = "https://api.telegram.org/bot#{Telegex.Global.token()}/sendPhoto"
+
+      form = [
+        {"chat_id", to_string(id)},
+        {:file, att.filepath,
+         {"form-data", [{"name", "photo"}, {"filename", Path.basename(att.filepath)}]}, []}
+      ]
+
+      # Make the request
+      with {:ok, _response} <- HTTPoison.post(url, {:multipart, form}) do
+        :ok
+      end
+    end
+
     send_response_attachments(msg, atts)
   end
 end

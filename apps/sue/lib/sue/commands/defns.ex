@@ -44,11 +44,15 @@ defmodule Sue.Commands.Defns do
       [word, val] ->
         var = word |> String.downcase()
 
-        {:ok, _} =
-          Defn.new(var, val, :text)
-          |> DB.add_defn(msg.account.id, msg.chat.id)
+        if String.contains?(var, "@") do
+          %Response{body: "Please don't put @ symbols in definitions."}
+        else
+          {:ok, _} =
+            Defn.new(var, val, :text)
+            |> DB.add_defn(msg.account.id, msg.chat.id)
 
-        %Response{body: "#{var} updated."}
+          %Response{body: "#{var} updated."}
+        end
     end
   end
 
