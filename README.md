@@ -79,7 +79,7 @@ If you don't want to connect via the root Arango account, make sure the user you
 import Config
 
 # Telegram API
-config :ex_gram, token: "mytoken"
+config :telegex, token: "mytoken"
 
 # Discord API
 config :nostrum,
