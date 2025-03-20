@@ -37,7 +37,7 @@ defmodule Sue.Commands.Poll do
         %Poll{interface: :platform} ->
           %Response{body: "Please use this messenger's custom polling interface."}
 
-        p ->
+        _p ->
           vote(poll, msg)
       end
     else

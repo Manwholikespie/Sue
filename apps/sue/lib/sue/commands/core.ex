@@ -102,7 +102,7 @@ defmodule Sue.Commands.Core do
           "Hmm, I couldn't find that command. See the list of commands with !help"
 
         {_, _, ""} ->
-          "No documentation for that yet. Let us know! https://github.com/inculi/Sue"
+          "No documentation for that yet. Let us know! https://github.com/Manwholikespie/Sue"
 
         {_, _, doc} ->
           doc

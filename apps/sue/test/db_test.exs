@@ -14,22 +14,32 @@ defmodule DBTest do
   test "defns" do
     Schema.debug_clear_collections()
 
-    d = Defn.new("megumin", "acute", :text)
+    text_defn = Defn.new("megumin", "acute", :text)
+    prompt_defn = Defn.new("poem", "Write a poem about $topic", :prompt)
 
     {_, a} = mock_paccount_account()
 
     c = mock_chat()
 
     # upsert should prevent this from duplicating.
-    {:ok, defn_id1} = DB.add_defn(d, a.id, c.id)
-    {:ok, defn_id2} = DB.add_defn(d, a.id, c.id)
-    [defn] = DB.get_defns_by_user(a.id)
+    {:ok, text_defn_id1} = DB.add_defn(text_defn, a.id, c.id)
+    {:ok, text_defn_id2} = DB.add_defn(text_defn, a.id, c.id)
+    {:ok, prompt_defn_id} = DB.add_defn(prompt_defn, a.id, c.id)
 
-    {:ok, defn_searched} = DB.find_defn(a.id, c.is_direct, "megumin")
+    defns = DB.get_defns_by_user(a.id)
+    assert length(defns) == 2
 
-    assert defn_id1 == defn_id2
-    assert defn_id1 == defn.id
-    assert defn.id == defn_searched.id
+    # Test finding text definition
+    {:ok, text_defn_searched} = DB.find_defn(a.id, c.is_direct, "megumin")
+
+    # Test finding prompt definition
+    {:ok, prompt_defn_searched} = DB.find_defn(a.id, c.is_direct, "poem")
+
+    assert text_defn_id1 == text_defn_id2
+    assert text_defn_id1 == text_defn_searched.id
+    assert text_defn_searched.type == :text
+    assert prompt_defn_id == prompt_defn_searched.id
+    assert prompt_defn_searched.type == :prompt
   end
 
   test "defn ownership" do
@@ -63,7 +73,6 @@ defmodule DBTest do
     [%Defn{id: ^d_a1_id}] = DB.get_defns_by_chat(c_a1.id)
     [%Defn{id: ^d_a2_id}] = DB.get_defns_by_chat(c_a1a2.id)
 
-    # TODO: FIX: this currently fails. hmm.
     # a2 is sue_users/173417
     {:ok, _} = DB.find_defn(a2.id, c_a1a2.is_direct, "megumin")
   end

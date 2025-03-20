@@ -34,6 +34,8 @@ defmodule Sue.AI do
   Avoid starting messages with greetings like "Hi [name]". Use names for personalization only when necessary, and if a user has only a numerical ID, opt for a neutral address. Respond in a friendly, conversational manner.
   """
 
+  @allowed_models [:gpt4o, :gpt4omini]
+
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
@@ -43,17 +45,8 @@ defmodule Sue.AI do
     {:ok, []}
   end
 
-  @spec chat_completion(bitstring(), :gpt4o | :gpt4omini, Chat.t(), Account.t()) :: bitstring()
-  def chat_completion(text, modelversion, chat, account)
-      when is_atom(modelversion) do
-    model =
-      case modelversion do
-        :gpt4o -> "gpt-4o"
-        :gpt4omini -> "gpt-4o-mini"
-      end
-
-    Logger.debug("Running chat_completion with #{model}")
-
+  @spec chat_completion(bitstring(), Chat.t(), Account.t(), :gpt4o | :gpt4omini) :: bitstring()
+  def chat_completion(text, chat, account, model_version \\ :gpt4omini) do
     maxlen = if account.is_premium, do: 4_000, else: 1_000
 
     prompt_user_count =
@@ -79,6 +72,21 @@ defmodule Sue.AI do
         ]
 
     Logger.debug(messages |> inspect(pretty: true))
+    raw_chat_completion_messages(messages, model_version)
+  end
+
+  @doc """
+  Similar to chat_completion, but doesn't care about prior chat context or our default prompt.
+  """
+  def raw_chat_completion_messages(messages, model_version \\ :gpt4omini)
+      when model_version in @allowed_models do
+    model =
+      case model_version do
+        :gpt4o -> "gpt-4o"
+        :gpt4omini -> "gpt-4o-mini"
+      end
+
+    Logger.debug("Running chat_completion with #{model}")
 
     with {:ok, response} <-
            OpenAI.chat_completion(
@@ -100,6 +108,15 @@ defmodule Sue.AI do
         Logger.error("[Sue.AI.chat_completion()] #{status_message}")
         status_message
     end
+  end
+
+  def raw_chat_completion_text(text, model_version \\ :gpt4omini) do
+    messages = [
+      %{role: "developer", content: "You are a helpful assistant."},
+      %{role: "user", content: text}
+    ]
+
+    raw_chat_completion_messages(messages, model_version)
   end
 
   @spec recent_messages_for_context(Subaru.dbid(), boolean(), bitstring(), integer()) :: [map()]
