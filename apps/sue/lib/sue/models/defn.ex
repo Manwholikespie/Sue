@@ -7,7 +7,7 @@ defmodule Sue.Models.Defn do
   @type t() :: %__MODULE__{
           var: bitstring(),
           val: bitstring() | integer(),
-          type: :text | :num | :bin | :func,
+          type: :text | :prompt | :bin | :func,
           date_created: integer(),
           date_modified: integer(),
           id: Subaru.dbid() | nil
@@ -17,9 +17,9 @@ defmodule Sue.Models.Defn do
 
   alias __MODULE__
 
-  # TODO: Add support for more defn types (currently just :text)
+  # Support for multiple defn types
   @spec new(bitstring(), bitstring(), atom()) :: t
-  def new(var, val, :text = type) when is_bitstring(var) and is_bitstring(val) do
+  def new(var, val, type) when is_bitstring(var) and is_bitstring(val) and type in [:text, :prompt] do
     now = Sue.Utils.unix_now()
 
     %Defn{
