@@ -66,12 +66,12 @@ defmodule Subaru.DB do
     GenServer.call(__MODULE__, :ping)
   end
 
-  @spec insert(Map.t(), bitstring()) :: any
+  @spec insert(map(), bitstring()) :: any
   def insert(doc, collection) do
     GenServer.call(__MODULE__, {:insert, doc, collection})
   end
 
-  @spec upsert(Map.t(), Map.t(), Map.t(), bitstring()) :: any
+  @spec upsert(map(), map(), map(), bitstring()) :: any
   def upsert(searchdoc, insertdoc, updatedoc, collection) do
     GenServer.call(__MODULE__, {:upsert, searchdoc, insertdoc, updatedoc, collection})
   end
@@ -100,7 +100,7 @@ defmodule Subaru.DB do
     GenServer.call(__MODULE__, {:remove_collection, name})
   end
 
-  @spec add_multi([{:doc | :edge, Map.t(), bitstring()}, ...]) :: any()
+  @spec add_multi([{:doc | :edge, map(), bitstring()}, ...]) :: any()
   def add_multi([]), do: {[], %{}}
 
   def add_multi(items_and_collections) do

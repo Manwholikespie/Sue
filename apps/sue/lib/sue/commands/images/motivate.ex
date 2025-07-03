@@ -1,98 +1,147 @@
 defmodule Sue.Commands.Images.Motivate do
   alias Sue.Utils
+  require Logger
 
-  import Mogrify
+  @type image() :: Vix.Vips.Image.t()
 
-  def top_text(text, img, path) do
+  @spec top_text(bitstring()) :: image()
+  defp top_text(text) do
+    {:ok, {img, _}} =
+      Vix.Vips.Operation.text(
+        ~s(<span foreground="white">#{text}</span>),
+        rgba: true,
+        wrap: :VIPS_TEXT_WRAP_WORD_CHAR,
+        font: "serif 56",
+        width: 600,
+        align: :VIPS_ALIGN_CENTRE
+      )
+
     img
-    |> custom("size", "600")
-    |> custom("background", "black")
-    |> custom("font", "Times")
-    |> custom("gravity", "center")
-    |> custom("pointsize", "56")
-    |> custom("pango", ~s(<span foreground="white">#{text}</span>))
-    |> create(path: path)
   end
 
-  # TODO: Remove when I figure out how to get extent working...
-  def middle_spacing(img, path, height \\ 10) when is_integer(height) do
+  @spec middle_spacing(integer()) :: image()
+  defp middle_spacing(height \\ 10) when is_integer(height) do
+    Image.new!(600, height)
+  end
+
+  @spec bot_text(bitstring()) :: image()
+  defp bot_text(text) do
+    {:ok, {img, _}} =
+      Vix.Vips.Operation.text(
+        ~s(<span foreground="white">#{text}</span>),
+        rgba: true,
+        wrap: :VIPS_TEXT_WRAP_WORD_CHAR,
+        font: "serif 28",
+        width: 600,
+        align: :VIPS_ALIGN_CENTRE
+      )
+
     img
-    |> custom("size", "600x#{height}")
-    |> canvas("black")
-    |> custom("fill", "black")
-    |> create(path: path)
   end
 
-  @spec bottom_text(any, %{:operations => list, optional(any) => any}, any) :: %{
-          :dirty => %{},
-          :operations => [],
-          optional(any) => any
-        }
-  def bottom_text(text, img, path) do
-    img
-    |> custom("size", "600")
-    |> custom("background", "black")
-    |> custom("font", "Times")
-    |> custom("gravity", "center")
-    |> custom("pointsize", "28")
-    |> custom("pango", ~s(<span foreground="white">#{text}</span>))
-    |> create(path: path)
+  @spec rescale(image(), integer()) :: image()
+  defp rescale(img, max_size) do
+    {orig_w, orig_h, _bands} = Image.shape(img)
+    scale = max_size / max(orig_w, orig_h)
+    Image.resize!(img, scale, vertical_scale: scale)
   end
 
-  def borders(in_img_path, out_img_path) do
-    # we will be saving changes to the file in-place
-    File.cp!(in_img_path, out_img_path)
+  @spec border(image(), atom(), integer()) :: image()
+  defp border(img, color, thickness) do
+    {w, h, _bands} = Image.shape(img)
 
-    open(in_img_path)
-    |> custom("scale", "500")
-    |> custom("bordercolor", "black")
-    |> custom("border", "5")
-    |> custom("bordercolor", "white")
-    |> custom("border", "3")
-    |> custom("mattecolor", "black")
-    |> custom("frame", "50x50")
-    |> custom("geometry", "600")
-    |> save(path: out_img_path)
-  end
-
-  def append(img, pattern, path) do
-    img
-    |> custom("append", pattern)
-    |> create(path: path)
-  end
-
-  def run(imagepath, top_text, bot_text) do
-    tmp_file_prefix = Utils.tmp_file_name("")
-    workingpath = System.tmp_dir!()
-
-    borders(imagepath, Path.join([workingpath, tmp_file_prefix <> "1.png"]))
-
-    top_text(
-      top_text,
-      %Mogrify.Image{path: tmp_file_prefix <> "2.png", ext: "png"},
-      workingpath
+    Image.embed!(
+      img,
+      w + 2 * thickness,
+      h + 2 * thickness,
+      background_color: color
     )
+  end
 
-    _bot_img =
-      if bot_text |> String.trim() |> String.length() > 0 do
-        middle_spacing(%Mogrify.Image{path: tmp_file_prefix <> "3.png", ext: "png"}, workingpath)
+  @spec borders(image()) :: image()
+  defp borders(center_img) do
+    part1 =
+      center_img
+      |> rescale(500)
+      |> border(:black, 5)
+      |> border(:white, 3)
+      |> border(:black, 50)
 
-        bottom_text(
-          bot_text,
-          %Mogrify.Image{path: tmp_file_prefix <> "4.png", ext: "png"},
-          workingpath
-        )
-      else
+    {w, h, _bands} = Image.shape(part1)
+    Image.crop!(part1, 0, 0, w, h - 50)
+  end
+
+  def manual_join(img1, img2) do
+    # get dimensions
+    {w1, h1, _} = Image.shape(img1)
+    {w2, h2, _} = Image.shape(img2)
+
+    width = max(w1, w2)
+    height = h1 + h2
+
+    # embed the first image into a blank canvas
+    canvas1 = Image.embed!(img1, width, height, x: :center, y: 0)
+
+    # overlay the second image at y = h1, centered horizontally
+    Image.compose!(canvas1, img2, x: :center, y: h1)
+  end
+
+  def pad(img, t, b) do
+    {w, h, _} = Image.shape(img)
+
+    Image.embed!(
+      img,
+      w,
+      h + t + b,
+      x: 0,
+      y: t,
+      background_color: :black
+    )
+  end
+
+  @spec alphatize(image()) :: image()
+  defp alphatize(img) do
+    {w, h, _bands} = Image.shape(img)
+    alpha = Image.new!(w, h, bands: 1, color: 255)
+    Image.add_alpha!(img, alpha)
+  end
+
+  defp escape_html_text(string) do
+    string =
+      string
+      |> Phoenix.HTML.html_escape()
+      |> Phoenix.HTML.safe_to_string()
+
+    {:ok, string}
+  end
+
+  def motivate(imagepath, ttext, btext) do
+    {:ok, ttext} = escape_html_text(ttext)
+    {:ok, btext} = escape_html_text(btext)
+
+    center_img =
+      Image.open!(imagepath)
+      |> Image.flatten!()
+      |> borders()
+
+    caption_img =
+      case btext do
+        "" ->
+          pad(top_text(ttext), 15, 20)
+
+        _ ->
+          manual_join(
+            pad(top_text(ttext), 15, 20),
+            pad(bot_text(btext), 0, 20)
+          )
       end
 
-    middle_spacing(%Mogrify.Image{path: tmp_file_prefix <> "5.png", ext: "png"}, workingpath, 20)
+    out_path = Path.join(System.tmp_dir!(), Utils.tmp_file_name("out.png"))
 
-    append(
-      %Mogrify.Image{path: tmp_file_prefix <> "out.png", ext: "png"},
-      Path.join([workingpath, tmp_file_prefix <> "*.png"]),
-      workingpath
-    )
+    manual_join(center_img, caption_img)
+    |> Image.flatten!()
+    |> Image.write!(out_path)
 
-    Path.join([workingpath, tmp_file_prefix <> "out.png"])
+    out_path
   end
 end

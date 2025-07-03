@@ -63,6 +63,9 @@ defmodule Sue.Commands.Images do
 
       {:error, %Attachment{} = att} ->
         %Response{body: "There was an issue with the attachment: #{inspect(att.errors)}"}
+
+      {:error, :invalid_attachment} ->
+        %Response{body: "Unable to download the attachment. Please try again."}
     end
   end
 
@@ -84,7 +87,7 @@ defmodule Sue.Commands.Images do
   end
 
   defp motivate_helper(path, top_text, bot_text) do
-    outpath = Images.Motivate.run(path, top_text, bot_text)
+    outpath = Images.Motivate.motivate(path, top_text, bot_text)
     %Attachment{filepath: outpath}
   end
 

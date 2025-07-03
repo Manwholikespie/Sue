@@ -19,7 +19,8 @@ defmodule Sue.Models.Defn do
 
   # Support for multiple defn types
   @spec new(bitstring(), bitstring(), atom()) :: t
-  def new(var, val, type) when is_bitstring(var) and is_bitstring(val) and type in [:text, :prompt] do
+  def new(var, val, type)
+      when is_bitstring(var) and is_bitstring(val) and type in [:text, :prompt] do
     now = Sue.Utils.unix_now()
 
     %Defn{

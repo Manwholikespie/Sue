@@ -64,6 +64,8 @@ defmodule Sue.Models.Message do
 
   @spec from_imessage(Keyword.t()) :: t
   def from_imessage(kw) do
+    Logger.debug("casting: #{kw |> inspect(pretty: true)}")
+
     [
       id: handle_id,
       person_centric_id: _handle_person_centric_id,
@@ -241,10 +243,10 @@ defmodule Sue.Models.Message do
   # a command arg (Process only the largest image).
   defp construct_attachments(%Message{platform: :telegram} = msg, data) do
     list_of_atts =
-      Map.get(data, :photo) ||
-        Map.get(data, :document) ||
-        Map.get(data, :reply_to_message, %{})[:photo] ||
-        Map.get(data, :reply_to_message, %{})[:document]
+      data.photo ||
+        data.document ||
+        if(data.reply_to_message, do: data.reply_to_message.photo, else: nil) ||
+        if data.reply_to_message, do: data.reply_to_message.document, else: nil
 
     list_of_atts =
       if is_map(list_of_atts) do

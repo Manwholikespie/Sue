@@ -11,5 +11,5 @@ defmodule Subaru.Vertex do
   @doc """
   Transforms the model into a map for DB storage.
   """
-  @callback doc(any()) :: Map.t()
+  @callback doc(any()) :: map()
 end

@@ -58,8 +58,8 @@ defmodule Sue.MixProject do
       {:cowlib, "~> 2.11", [env: :prod, hex: "remedy_cowlib", override: true, repo: "hexpm"]},
       {:gun, "2.0.1", [env: :prod, hex: "remedy_gun", override: true, repo: "hexpm"]},
       {:mime, "~> 1.2"},
-      # imagemagick
-      {:mogrify, "~> 0.8.0"}
+      # images
+      {:image, "~> 0.37"}
     ]
   end
 

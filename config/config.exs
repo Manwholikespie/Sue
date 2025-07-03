@@ -1,5 +1,17 @@
 import Config
 
+# Load .env file if it exists
+if File.exists?(".env") do
+  File.read!(".env")
+  |> String.split("\n", trim: true)
+  |> Enum.each(fn line ->
+    case String.split(line, "=", parts: 2) do
+      [key, value] -> System.put_env(key, value)
+      _ -> :ok
+    end
+  end)
+end
+
 config :desu_web,
   generators: [context_app: false]
 

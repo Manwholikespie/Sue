@@ -95,6 +95,24 @@ defmodule Sue.Models.Attachment do
     end
   end
 
+  def download(%Attachment{metadata: %{file_id: file_id}, mime_type: mime_type} = att) do
+    case download_telegram_file(file_id, mime_type) do
+      {:ok, filepath, fsize, mime_type} ->
+        {:ok,
+         %Attachment{
+           att
+           | downloaded: true,
+             filepath: filepath,
+             fsize: fsize,
+             mime_type: mime_type,
+             errors: check_size_for_errors(fsize)
+         }}
+
+      {:error, reason} ->
+        {:error, %Attachment{att | errors: [{:download_error, reason}]}}
+    end
+  end
+
   def download(_), do: {:error, :invalid_attachment}
 
   # Helper functions for checking if it's an image
@@ -114,6 +132,34 @@ defmodule Sue.Models.Attachment do
   @spec has_url?(t()) :: boolean()
   def has_url?(%Attachment{url: "http" <> _}), do: true
   def has_url?(_), do: false
+
+  # Download Telegram file to local path
+  defp download_telegram_file(file_id, original_mime_type \\ nil) do
+    case Telegex.get_file(file_id) do
+      {:ok, %Telegex.Type.File{file_path: file_path, file_size: file_size}} ->
+        token = Telegex.Global.token()
+        download_url = "https://api.telegram.org/file/bot#{token}/#{file_path}"
+
+        filename = Sue.Utils.unique_string()
+        filepath = Path.join(@tmp_path, filename <> Path.extname(file_path))
+
+        case HTTPoison.get(download_url) do
+          {:ok, %HTTPoison.Response{body: body, headers: headers}} ->
+            File.write!(filepath, body)
+            fsize = byte_size(body)
+
+            # Prefer original mime type from Telegram if available, fallback to headers
+            mime_type = original_mime_type || extract_mime_from_headers(headers) || @default_mime
+            {:ok, filepath, fsize, mime_type}
+
+          {:error, %HTTPoison.Error{reason: reason}} ->
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
   # Download URL to local path
   defp download_url(url) do

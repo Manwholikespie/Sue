@@ -39,7 +39,7 @@ defmodule Sue.Models.Account do
     |> from_doc()
   end
 
-  @spec from_doc(Map.t()) :: t
+  @spec from_doc(map()) :: t
   def from_doc(doc) do
     %Account{
       name: doc["name"],
