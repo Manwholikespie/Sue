@@ -16,7 +16,7 @@ defmodule Subaru.Query do
 
   @type t() :: %__MODULE__{
           q: queue(),
-          bindvars: Map.t(),
+          bindvars: map(),
           statement: [bitstring()],
           context: [atom()],
           depth: integer(),
@@ -637,7 +637,7 @@ defmodule Subaru.Query do
     %Query{query | bindvars: Map.put(query.bindvars, key, value)}
   end
 
-  @spec merge_bindvars(t, Map.t()) :: t
+  @spec merge_bindvars(t, map()) :: t
   defp merge_bindvars(query, bindvars) do
     %Query{query | bindvars: Map.merge(query.bindvars, bindvars)}
   end

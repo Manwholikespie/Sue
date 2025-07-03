@@ -7,6 +7,7 @@ db_data/
 # Development crumbs
 .elixir_ls/
 .vscode/
+.claude/
 
 # The directory Mix will write compiled artifacts to.
 /_build/
