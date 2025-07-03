@@ -55,8 +55,8 @@ defmodule Sue.MixProject do
       {:replicate, "~> 1.1.0"},
       # discord
       {:nostrum, git: "https://github.com/Kraigie/nostrum", runtime: false},
-      {:cowlib, "~> 2.11", [env: :prod, hex: "remedy_cowlib", override: true, repo: "hexpm"]},
-      {:gun, "2.0.1", [env: :prod, hex: "remedy_gun", override: true, repo: "hexpm"]},
+      {:cowlib, "~> 2.15"},
+      {:gun, "~> 2.2"},
       {:mime, "~> 1.2"},
       # images
       {:image, "~> 0.37"}

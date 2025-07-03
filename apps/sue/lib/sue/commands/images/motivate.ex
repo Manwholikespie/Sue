@@ -19,11 +19,6 @@ defmodule Sue.Commands.Images.Motivate do
     img
   end
 
-  @spec middle_spacing(integer()) :: image()
-  defp middle_spacing(height \\ 10) when is_integer(height) do
-    Image.new!(600, height)
-  end
-
   @spec bot_text(bitstring()) :: image()
   defp bot_text(text) do
     {:ok, {img, _}} =
@@ -97,13 +92,6 @@ defmodule Sue.Commands.Images.Motivate do
       y: t,
       background_color: :black
     )
-  end
-
-  @spec alphatize(image()) :: image()
-  defp alphatize(img) do
-    {w, h, _bands} = Image.shape(img)
-    alpha = Image.new!(w, h, bands: 1, color: 255)
-    Image.add_alpha!(img, alpha)
   end
 
   defp escape_html_text(string) do

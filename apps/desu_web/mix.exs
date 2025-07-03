@@ -48,9 +48,7 @@ defmodule DesuWeb.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
-      {:plug_cowboy, "~> 2.5"},
-      # make it play nice with Sue
-      {:cowlib, "~> 2.11", [env: :prod, hex: "remedy_cowlib", override: true, repo: "hexpm"]}
+      {:plug_cowboy, "~> 2.5"}
     ]
   end
 
