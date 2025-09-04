@@ -55,6 +55,7 @@ defmodule Sue.Commands.Dumb do
        "#{round(seconds / 1200)} ice hockey periods",
        "#{trunc(960 * hours)} human breaths",
        "#{:erlang.float_to_binary(days / 12, decimals: 2)} Virginian opossum gestation periods",
+      "#{:erlang.float_to_binary(hours / 3522.5, decimals: 4)} Martha Stewart incarcerations",
        "#{trunc(seconds / 66.46)} smoker deaths",
        "#{trunc(seconds / 180)} Perilla tea steepings",
        "#{trunc(seconds / 150)} commercial breaks",
