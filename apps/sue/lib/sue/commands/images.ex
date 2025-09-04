@@ -13,7 +13,7 @@ defmodule Sue.Commands.Images do
   Usage: !doog
   """
   def c_doog(_msg) do
-    %Attachment{filepath: Path.join(@media_path, "korone.JPG")}
+    %Attachment{filepath: Path.join(@media_path, "korone.JPG"), downloaded: true}
   end
 
   @doc """
@@ -21,7 +21,7 @@ defmodule Sue.Commands.Images do
   Usage: !1984
   """
   def c_1984(_msg) do
-    %Attachment{filepath: Path.join(@media_path, "1984.jpg")}
+    %Attachment{filepath: Path.join(@media_path, "1984.jpg"), downloaded: true}
   end
 
   @doc """
@@ -88,7 +88,7 @@ defmodule Sue.Commands.Images do
 
   defp motivate_helper(path, top_text, bot_text) do
     outpath = Images.Motivate.motivate(path, top_text, bot_text)
-    %Attachment{filepath: outpath}
+    %Attachment{filepath: outpath, downloaded: true}
   end
 
   @spec random_image_from_dir(bitstring()) :: %Attachment{}
@@ -99,7 +99,7 @@ defmodule Sue.Commands.Images do
     |> File.ls!()
     |> Enum.random()
     |> (fn image ->
-          %Attachment{filepath: Path.join(path, image)}
+          %Attachment{filepath: Path.join(path, image), downloaded: true}
         end).()
   end
 end
