@@ -1,12 +1,11 @@
 defmodule Sue.Mailbox.Discord do
-  # We don't need a start_link, due to the way they've set up their __using__ macro.
   use Nostrum.Consumer
 
   require Logger
 
   alias Sue.Models.Attachment
   alias Sue.Models.{Message, Response}
-  alias Nostrum.Api
+  alias Nostrum.Api.Message, as: NostrumMessage
 
   import Nostrum.Struct.Embed
 
@@ -39,7 +38,7 @@ defmodule Sue.Mailbox.Discord do
   end
 
   def send_response_text(msg, rsp) do
-    with {:ok, _} <- Api.create_message(msg.metadata.channel_id, rsp.body) do
+    with {:ok, _} <- NostrumMessage.create(msg.metadata.channel_id, content: rsp.body) do
       :ok
     else
       error -> Logger.error(error |> inspect())
@@ -60,7 +59,7 @@ defmodule Sue.Mailbox.Discord do
         att.filepath
       end
 
-    Api.create_message(msg.metadata.channel_id, file: filepath)
+    NostrumMessage.create(msg.metadata.channel_id, files: [filepath])
 
     send_response_attachments(msg, atts)
   end
@@ -71,7 +70,7 @@ defmodule Sue.Mailbox.Discord do
       %Nostrum.Struct.Embed{}
       |> put_image(url)
 
-    {:ok, _message} = Api.create_message(msg.metadata.channel_id, embeds: [embed])
+    {:ok, _message} = NostrumMessage.create(msg.metadata.channel_id, embeds: [embed])
     :ok
   end
 end

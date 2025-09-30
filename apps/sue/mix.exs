@@ -23,9 +23,17 @@ defmodule Sue.MixProject do
   def application do
     [
       mod: {Sue.Application, []},
-      included_applications: [:nostrum],
-      extra_applications: [:logger, :runtime_tools, :finch, :multipart, :eex]
+      extra_applications: [:logger, :runtime_tools, :finch, :multipart, :eex],
+      included_applications: included_applications()
     ]
+  end
+
+  defp included_applications do
+    # Nostrum 0.10+ starts automatically as an OTP app, but we only want it
+    # to start if Discord is enabled in the config. By including it here,
+    # we prevent it from auto-starting, and manually start it in Sue.Application
+    # only when :discord is in the platforms list.
+    [:nostrum]
   end
 
   # Specifies which paths to compile per environment.
@@ -50,11 +58,10 @@ defmodule Sue.MixProject do
       # telegram - end
       {:jason, "~> 1.2"},
       {:hammer, "~> 6.1"},
-      {:exqlite, "~> 0.13"},
       {:openai, "~> 0.5.2"},
       {:replicate, "~> 1.1.0"},
       # discord
-      {:nostrum, git: "https://github.com/Kraigie/nostrum", runtime: false},
+      {:nostrum, "~> 0.10"},
       {:cowlib, "~> 2.15"},
       {:gun, "~> 2.2"},
       {:mime, "~> 1.2"},

@@ -62,22 +62,32 @@ defmodule Sue.Models.Message do
           metadata: map()
         }
 
-  @spec from_imessage(Keyword.t()) :: t
-  def from_imessage(kw) do
-    Logger.debug("casting: #{kw |> inspect(pretty: true)}")
+  @spec from_imessage(map()) :: t
+  def from_imessage(msg) when is_map(msg) do
+    Logger.debug("casting: #{msg |> inspect(pretty: true)}")
 
-    [
-      id: handle_id,
-      person_centric_id: _handle_person_centric_id,
-      cache_has_attachments: has_attachments,
-      text: text,
-      ROWID: message_id,
-      cache_roomnames: chat_id,
-      is_from_me: from_me,
-      utc_date: utc_date
-    ] = kw
+    message_id = msg["ROWID"]
+    handle_id = msg["sender"]
+    has_attachments = msg["has_attachments"]
+    text = msg["content"]
+    chat_identifier = msg["chat_identifier"]
+    is_direct = msg["is_direct"]
+    service = msg["service"]
+    from_me = msg["from_me"] == 1
+    attachments = msg["attachments"] || []
 
-    from_me = from_me == 1
+    # Parse the date string to DateTime
+    # Date format from SQLite: "2024-01-15 10:30:45"
+    time =
+      case msg["date"] do
+        nil -> DateTime.utc_now()
+        date_str when is_binary(date_str) ->
+          case NaiveDateTime.from_iso8601(String.replace(date_str, " ", "T")) do
+            {:ok, naive_dt} -> DateTime.from_naive!(naive_dt, "Etc/UTC")
+            _ -> DateTime.utc_now()
+          end
+        _ -> DateTime.utc_now()
+      end
 
     paccount =
       %PlatformAccount{platform_id: {:imessage, handle_id}}
@@ -85,8 +95,8 @@ defmodule Sue.Models.Message do
 
     chat =
       %Chat{
-        platform_id: {:imessage, chat_id || "direct;#{handle_id}"},
-        is_direct: chat_id == nil
+        platform_id: {:imessage, chat_identifier || handle_id},
+        is_direct: is_direct
       }
       |> Chat.resolve()
 
@@ -105,12 +115,14 @@ defmodule Sue.Models.Message do
       body: body,
       command: command,
       args: args,
-      time: DateTime.from_unix!(utc_date),
+      attachments: attachments,
+      time: time,
       #
       is_from_sue: from_me,
       is_ignorable:
         is_ignorable?(:imessage, from_me, body) or account.is_ignored or chat.is_ignored,
-      has_attachments: has_attachments == 1
+      has_attachments: has_attachments == 1,
+      metadata: %{service: service}
     }
     |> add_account_and_chat_to_graph()
   end
@@ -359,8 +371,4 @@ defmodule Sue.Models.Message do
       "#Message<#{platform},#{cid},#{aid}>"
     end
   end
-
-  def helper_is_direct?({:telegram, plid}, {_, plid}), do: true
-  def helper_is_direct?(_, {:imessage, "direct;" <> _}), do: true
-  def helper_is_direct?(_, _), do: false
 end

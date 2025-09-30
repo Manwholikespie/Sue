@@ -5,7 +5,6 @@ defmodule Sue.Application do
   require Logger
 
   @platforms Application.compile_env(:sue, :platforms, [])
-  @chat_db_path Application.compile_env(:sue, :chat_db_path)
 
   def start(_type, _args) do
     children = [
@@ -19,8 +18,7 @@ defmodule Sue.Application do
       if Sue.Utils.contains?(@platforms, :imessage) do
         # Method used to avoid strange Dialyzer error...
         [
-          Sue.Mailbox.IMessage,
-          {Sue.Mailbox.IMessageSqlite, [@chat_db_path]}
+          Sue.Mailbox.IMessage
         ]
       else
         []
@@ -35,6 +33,8 @@ defmodule Sue.Application do
 
     children_discord =
       if Sue.Utils.contains?(@platforms, :discord) do
+        # Nostrum 0.10+ is an included_application (doesn't auto-start)
+        # Start Nostrum first, then our consumer which will register itself
         [
           Nostrum.Application,
           Sue.Mailbox.Discord
