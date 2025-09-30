@@ -111,18 +111,26 @@ config :replicate,
 
 8. [Install Elixir](https://gist.github.com/Manwholikespie/1bc76cba05f536fc5ec5f998cb56ac97) if you don't already have it.
 
-9. Install Xcode. This is needed for the sdp tool for [imessaged](github.com/Manwholikespie/imessaged).
+9. Install Rust nightly. This is needed for [crabstep](https://github.com/ReagentX/crabstep) which reads iMessage's typedstream.
+
+```bash
+curl https://sh.rustup.rs -sSf | sh
+rustup install nightly
+rustup default nightly
+```
+
+10. Install Xcode. This is needed for the sdp tool for [imessaged](github.com/Manwholikespie/imessaged).
 
 ```bash
 # After installing, switch the active developer directory to Xcode
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
 
-10. `mix deps.get`
+11. `mix deps.get`
 
-11. To create a prod build, run `MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
+12. To create a prod build, run `MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
 
-12. To run in interactive dev mode, you can run `iex -S mix`.  If you want to Telegram to autocomplete your commands, run `Sue.post_init()` from within this interactive prompt. Sorry this part is a little scuffed.
+13. To run in interactive dev mode, you can run `iex -S mix`.  If you want to Telegram to autocomplete your commands, run `Sue.post_init()` from within this interactive prompt. Sorry this part is a little scuffed.
 
 ## How do I add a command?
 
