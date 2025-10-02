@@ -25,21 +25,6 @@ defmodule Sue.Commands.Gpt do
   end
 
   @doc """
-  Asks ChatGPT a question, using the newer GPT-4 model. Only available to premium users for now.
-  Usage !gpt4 write a poem about a bot named sue
-  """
-  def c_h_gpt4(%Message{account: %Account{is_premium: false}}) do
-    %Response{
-      body:
-        "Sorry, this command is only available for premium Sue users. Check back later for more info, or use !gpt instead."
-    }
-  end
-
-  def c_h_gpt4(%Message{args: args, chat: chat, account: %Account{is_premium: true} = account}) do
-    %Response{body: Sue.AI.chat_completion(args, chat, account, :gpt4o), is_from_gpt: true}
-  end
-
-  @doc """
   Prompt an emoji-finetuned stable diffusion model.
   Usage: !emoji Ryan Gosling
   """
