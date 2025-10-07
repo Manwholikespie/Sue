@@ -57,9 +57,6 @@ defmodule Sue.Mailbox.IMessage do
     Imessaged.send_message_to_buddy(rsp.body, account_id)
   end
 
-  # TODO: This would only work for iMessage groups, not SMS. Which for me personally
-  #   is how I'd want it to be, but others may not. Changing it now would affect
-  #   group IDs though, most likely.
   defp send_response_text(%Message{chat: %Chat{is_direct: false}} = msg, rsp) do
     {_platform, chat_identifier} = msg.chat.platform_id
     service = Map.get(msg.metadata, :service, "iMessage")
