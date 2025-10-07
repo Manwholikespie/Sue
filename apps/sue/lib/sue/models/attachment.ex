@@ -132,7 +132,7 @@ defmodule Sue.Models.Attachment do
   def has_url?(_), do: false
 
   # Download Telegram file to local path
-  defp download_telegram_file(file_id, original_mime_type \\ nil) do
+  defp download_telegram_file(file_id, original_mime_type) do
     case Telegex.get_file(file_id) do
       {:ok, %Telegex.Type.File{file_path: file_path, file_size: file_size}} ->
         token = Telegex.Global.token()
@@ -144,11 +144,10 @@ defmodule Sue.Models.Attachment do
         case HTTPoison.get(download_url) do
           {:ok, %HTTPoison.Response{body: body, headers: headers}} ->
             File.write!(filepath, body)
-            fsize = byte_size(body)
 
             # Prefer original mime type from Telegram if available, fallback to headers
             mime_type = original_mime_type || extract_mime_from_headers(headers) || @default_mime
-            {:ok, filepath, fsize, mime_type}
+            {:ok, filepath, file_size, mime_type}
 
           {:error, %HTTPoison.Error{reason: reason}} ->
             {:error, reason}
