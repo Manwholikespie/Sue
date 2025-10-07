@@ -44,7 +44,7 @@ defmodule Sue.Commands.Defns do
     end
   end
 
-  @spec c_define(atom | %{:args => binary, optional(any) => any}) :: Sue.Models.Response.t()
+  @spec c_define(Message.t()) :: Response.t()
   @doc """
   Create a quick alias that makes Sue say something or do something.
   Usage: !define [type] <word> <... value ...>
@@ -149,6 +149,9 @@ defmodule Sue.Commands.Defns do
   end
 
   # Helper to group definitions by type
+  # Called via apply/3 in Sue.execute_command, so Dialyzer can't detect usage
+  @dialyzer {:nowarn_function, group_defns_by_type: 1}
+  @spec group_defns_by_type([Defn.t()]) :: %{atom() => [Defn.t()]}
   defp group_defns_by_type(defns) do
     defns
     |> Enum.group_by(fn d -> d.type end)
@@ -159,6 +162,9 @@ defmodule Sue.Commands.Defns do
   end
 
   # Helper to format definitions grouped by type
+  # Called via apply/3 in Sue.execute_command, so Dialyzer can't detect usage
+  @dialyzer {:nowarn_function, format_defns_by_type: 2}
+  @spec format_defns_by_type(%{atom() => [Defn.t()]}, String.t()) :: String.t()
   defp format_defns_by_type(defns_by_type, source) do
     if Enum.empty?(defns_by_type) do
       ""

@@ -42,9 +42,6 @@ Commands are auto-discovered at startup. Any function prefixed with `c_` becomes
 # Install dependencies
 mix deps.get
 
-# Setup all child apps
-mix setup
-
 # Create secret config file (see README for template)
 touch config/config.secret.exs
 ```
