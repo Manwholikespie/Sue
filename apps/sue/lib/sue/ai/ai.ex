@@ -35,6 +35,7 @@ defmodule Sue.AI do
   """
 
   @allowed_models ["gpt-5-nano"]
+  @default_model "gpt-5-nano"
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
@@ -46,7 +47,7 @@ defmodule Sue.AI do
   end
 
   @spec chat_completion(bitstring(), Chat.t(), Account.t(), bitstring()) :: bitstring()
-  def chat_completion(text, chat, account, model_version \\ "gpt-5-nano")
+  def chat_completion(text, chat, account, model_version \\ @default_model)
       when model_version in @allowed_models do
     maxlen = if account.is_premium, do: 4_000, else: 1_000
 
@@ -80,7 +81,7 @@ defmodule Sue.AI do
   Similar to chat_completion, but doesn't care about prior chat context or our default prompt.
   """
   @spec raw_chat_completion_messages([map()], bitstring()) :: bitstring()
-  def raw_chat_completion_messages(messages, model_version)
+  def raw_chat_completion_messages(messages, model_version \\ @default_model)
       when model_version in @allowed_models do
     Logger.debug("Running chat_completion with #{model_version}")
 
@@ -107,7 +108,7 @@ defmodule Sue.AI do
   end
 
   @spec raw_chat_completion_text(bitstring(), bitstring()) :: bitstring()
-  def raw_chat_completion_text(text, model_version) when model_version in @allowed_models do
+  def raw_chat_completion_text(text, model_version \\ @default_model) when model_version in @allowed_models do
     messages = [
       %{role: "developer", content: "You are a helpful assistant."},
       %{role: "user", content: text}
