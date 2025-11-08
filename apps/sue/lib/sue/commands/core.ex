@@ -70,6 +70,10 @@ defmodule Sue.Commands.Core do
     end
   end
 
+  def c_h_version(_m) do
+    %Response{body: Sue.Version.full_version()}
+  end
+
   def help(%Message{args: ""}, commands) do
     # Hide commands that start with h_. I'll use these for internal debugging.
     %Response{

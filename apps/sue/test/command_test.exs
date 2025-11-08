@@ -75,4 +75,11 @@ defmodule CommandTest do
     r = Sue.debug_blocking_process_message(m)
     assert String.contains?(r.body, "deny")
   end
+
+  test "h_version" do
+    m = Message.from_debug("!h_version")
+    r = Sue.debug_blocking_process_message(m)
+    assert String.contains?(r.body, "Sue v")
+    assert String.contains?(r.body, "Git:")
+  end
 end
