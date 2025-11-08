@@ -34,8 +34,8 @@ defmodule Sue.AI do
   Avoid starting messages with greetings like "Hi [name]". Use names for personalization only when necessary, and if a user has only a numerical ID, opt for a neutral address. Respond in a friendly, conversational manner.
   """
 
-  @allowed_models ["gpt-5-nano"]
-  @default_model "gpt-5-nano"
+  @allowed_models ["gpt-5-nano", "gpt-4o-mini"]
+  @default_model "gpt-4o-mini"
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
