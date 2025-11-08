@@ -32,7 +32,15 @@ defmodule Sue.Models.Attachment do
   @default_mime "application/octet-stream"
 
   # Constructor for iMessage attachments
-  def new(%{"attachment_id" => aid, "filename" => filename, "mime_type" => mime_type, "total_bytes" => fsize} = att, :imessage) do
+  def new(
+        %{
+          "attachment_id" => aid,
+          "filename" => filename,
+          "mime_type" => mime_type,
+          "total_bytes" => fsize
+        } = att,
+        :imessage
+      ) do
     filepath = Sue.Utils.resolve_filepath(filename)
     mid = Map.get(att, "message_id")
 

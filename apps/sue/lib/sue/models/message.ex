@@ -80,13 +80,17 @@ defmodule Sue.Models.Message do
     # Date format from SQLite: "2024-01-15 10:30:45"
     time =
       case msg["date"] do
-        nil -> DateTime.utc_now()
+        nil ->
+          DateTime.utc_now()
+
         date_str when is_binary(date_str) ->
           case NaiveDateTime.from_iso8601(String.replace(date_str, " ", "T")) do
             {:ok, naive_dt} -> DateTime.from_naive!(naive_dt, "Etc/UTC")
             _ -> DateTime.utc_now()
           end
-        _ -> DateTime.utc_now()
+
+        _ ->
+          DateTime.utc_now()
       end
 
     paccount =

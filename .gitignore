@@ -3,6 +3,7 @@ mnesia/
 db_data/
 .DS_Store
 .env
+deploy.sh
 
 # Development crumbs
 .elixir_ls/

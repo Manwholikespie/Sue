@@ -179,5 +179,4 @@ defmodule Sue.Mailbox.IMessage do
         []
     end
   end
-
 end

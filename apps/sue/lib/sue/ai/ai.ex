@@ -108,7 +108,8 @@ defmodule Sue.AI do
   end
 
   @spec raw_chat_completion_text(bitstring(), bitstring()) :: bitstring()
-  def raw_chat_completion_text(text, model_version \\ @default_model) when model_version in @allowed_models do
+  def raw_chat_completion_text(text, model_version \\ @default_model)
+      when model_version in @allowed_models do
     messages = [
       %{role: "developer", content: "You are a helpful assistant."},
       %{role: "user", content: text}
