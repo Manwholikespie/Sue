@@ -3,8 +3,21 @@ defmodule Sue.Version do
   Provides version and git information for Sue, captured at compile time.
   """
 
-  @external_resource ".git/HEAD"
-  @external_resource ".git/refs/heads/master"
+  # Umbrella root is 4 levels up. Use __DIR__ so recompile tracking
+  # follows the real .git, not apps/sue/.git (which doesn't exist).
+  @git_root Path.expand("../../../../.git", __DIR__)
+  @external_resource Path.join(@git_root, "HEAD")
+  @external_resource Path.join(@git_root, "packed-refs")
+
+  # Also track the current branch's ref file so new commits invalidate.
+  case File.read(Path.join(@git_root, "HEAD")) do
+    {:ok, "ref: " <> ref} ->
+      ref_path = Path.join(@git_root, String.trim(ref))
+      if File.exists?(ref_path), do: @external_resource(ref_path)
+
+    _ ->
+      :ok
+  end
 
   @git_sha (case System.cmd("git", ["rev-parse", "--short", "HEAD"], stderr_to_stdout: true) do
               {sha, 0} -> String.trim(sha)
@@ -18,7 +31,10 @@ defmodule Sue.Version do
                  _ -> "unknown"
                end)
 
-  @umbrella_version (case File.read("../../mix.exs") do
+  @umbrella_mix_exs Path.expand("../../../../mix.exs", __DIR__)
+  @external_resource @umbrella_mix_exs
+
+  @umbrella_version (case File.read(@umbrella_mix_exs) do
                        {:ok, content} ->
                          case Regex.run(~r/version:\s*"([^"]+)"/, content) do
                            [_, version] -> version
