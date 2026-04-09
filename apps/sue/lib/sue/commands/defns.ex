@@ -18,9 +18,10 @@ defmodule Sue.Commands.Defns do
   def calldefn(msg) do
     varname = msg.command
 
-    with {:ok, defn} <- DB.find_defn(msg.account.id, msg.chat.is_direct, varname) do
-      calldefn_type(msg, defn)
-    else
+    case DB.find_defn(msg.account.id, msg.chat.is_direct, varname) do
+      {:ok, defn} ->
+        calldefn_type(msg, defn)
+
       {:error, :dne} ->
         %Response{body: "Command not found. Add it with !define."}
     end
@@ -36,10 +37,8 @@ defmodule Sue.Commands.Defns do
   def calldefn_type(msg, %Defn{type: :prompt, val: val}) do
     prompt = String.replace(val, "$args", msg.args)
 
-    with :ok <-
-           Sue.Limits.check_rate("gpt:#{msg.account.id}", @gpt_rate_limit, msg.account.is_premium) do
-      %Response{body: Sue.AI.raw_chat_completion_text(prompt)}
-    else
+    case Sue.Limits.check_rate("gpt:#{msg.account.id}", @gpt_rate_limit, msg.account.is_premium) do
+      :ok -> %Response{body: Sue.AI.raw_chat_completion_text(prompt)}
       :deny -> %Response{body: "Please slow down your requests. Try again in 24 hours."}
     end
   end
@@ -69,50 +68,45 @@ defmodule Sue.Commands.Defns do
     do: %Response{body: "Please supply a word and meaning. See !help define"}
 
   def c_define(msg) do
-    # Split args into up to 3 parts: [type, var, val] or [var, val]
-    parts = msg.args |> String.split(" ", parts: 3)
+    with {:ok, type, var, val} <- parse_define_args(msg.args),
+         :ok <- validate_define_content(type, var, val) do
+      normalized = String.downcase(var)
 
-    {type, var, val} =
-      case parts do
-        # If we have 3 parts, check if the first one is a valid type
-        ["text", var, val] ->
-          {:text, var, val}
+      {:ok, _} =
+        Defn.new(normalized, val, type)
+        |> DB.add_defn(msg.account.id, msg.chat.id)
 
-        ["prompt", var, val] ->
-          {:prompt, var, val}
+      %Response{body: "#{normalized} updated."}
+    else
+      {:error, body} -> %Response{body: body}
+    end
+  end
 
-        # If the first part is not a valid type, or we only have 2 parts,
-        # assume default type (:text)
-        [var, val] ->
-          {:text, var, val}
+  # Split args into [type, var, val] or infer :text as the default type.
+  @spec parse_define_args(String.t()) ::
+          {:ok, :text | :prompt, String.t(), String.t()} | {:error, String.t()}
+  defp parse_define_args(args) do
+    case String.split(args, " ", parts: 3) do
+      ["text", var, val] -> {:ok, :text, var, val}
+      ["prompt", var, val] -> {:ok, :prompt, var, val}
+      [var, val] -> {:ok, :text, var, val}
+      [first, second, third] -> {:ok, :text, first, second <> " " <> third}
+      [_] -> {:error, "Please supply a word and meaning. See !help define"}
+    end
+  end
 
-        [first, second, third] ->
-          {:text, first, second <> " " <> third}
-
-        [_] ->
-          {nil, nil, nil}
-      end
-
+  @spec validate_define_content(:text | :prompt, String.t(), String.t()) ::
+          :ok | {:error, String.t()}
+  defp validate_define_content(type, var, val) do
     cond do
-      is_nil(type) ->
-        %Response{body: "Please supply a word and meaning. See !help define"}
-
       String.contains?(var, "@") ->
-        %Response{body: "Please don't put @ symbols in definitions."}
+        {:error, "Please don't put @ symbols in definitions."}
 
       type == :prompt and not String.contains?(val, "$args") ->
-        %Response{
-          body: "Prompts must have $args where they want args to be injected. See !help define"
-        }
+        {:error, "Prompts must have $args where they want args to be injected. See !help define"}
 
       true ->
-        var = var |> String.downcase()
-
-        {:ok, _} =
-          Defn.new(var, val, type)
-          |> DB.add_defn(msg.account.id, msg.chat.id)
-
-        %Response{body: "#{var} updated."}
+        :ok
     end
   end
 
@@ -163,40 +157,32 @@ defmodule Sue.Commands.Defns do
 
   # Helper to format definitions grouped by type
   # Called via apply/3 in Sue.execute_command, so Dialyzer can't detect usage
-  @dialyzer {:nowarn_function, format_defns_by_type: 2}
+  @dialyzer {:nowarn_function,
+             format_defns_by_type: 2, format_text_section: 1, format_other_sections: 1}
   @spec format_defns_by_type(%{atom() => [Defn.t()]}, String.t()) :: String.t()
+  defp format_defns_by_type(defns_by_type, _source) when map_size(defns_by_type) == 0, do: ""
+
   defp format_defns_by_type(defns_by_type, source) do
-    if Enum.empty?(defns_by_type) do
-      ""
-    else
-      result = "defns by #{source}:\n"
+    text_section = format_text_section(Map.get(defns_by_type, :text, []))
+    other_sections = format_other_sections(defns_by_type)
+    separator = if text_section != "" and other_sections != "", do: "\n", else: ""
 
-      # First, show text type definitions (the most common)
-      text_defns = Map.get(defns_by_type, :text, [])
+    "defns by #{source}:\n" <> text_section <> separator <> other_sections
+  end
 
-      text_section =
-        if Enum.empty?(text_defns) do
-          ""
-        else
-          text_defns
-          |> Enum.map(fn d -> "- #{d.var}" end)
-          |> Enum.join("\n")
-        end
+  @spec format_text_section([Defn.t()]) :: String.t()
+  defp format_text_section([]), do: ""
 
-      # Then show other types with their type annotation
-      other_sections =
-        defns_by_type
-        |> Enum.filter(fn {type, _} -> type != :text end)
-        |> Enum.map(fn {type, defs} ->
-          defs
-          |> Enum.map(fn d -> "- #{d.var} (#{type})" end)
-          |> Enum.join("\n")
-        end)
-        |> Enum.join("\n")
+  defp format_text_section(text_defns) do
+    Enum.map_join(text_defns, "\n", fn d -> "- #{d.var}" end)
+  end
 
-      result <>
-        text_section <>
-        if(text_section != "" and other_sections != "", do: "\n", else: "") <> other_sections
-    end
+  @spec format_other_sections(%{atom() => [Defn.t()]}) :: String.t()
+  defp format_other_sections(defns_by_type) do
+    defns_by_type
+    |> Enum.filter(fn {type, _} -> type != :text end)
+    |> Enum.map_join("\n", fn {type, defs} ->
+      Enum.map_join(defs, "\n", fn d -> "- #{d.var} (#{type})" end)
+    end)
   end
 end

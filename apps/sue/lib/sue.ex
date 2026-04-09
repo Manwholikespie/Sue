@@ -1,4 +1,6 @@
 defmodule Sue do
+  @moduledoc false
+
   use GenServer
   require Logger
 
@@ -27,14 +29,14 @@ defmodule Sue do
 
   @impl true
   def handle_cast({:process, %Message{command: "help"} = msg}, state) do
-    {uSecs, :ok} =
+    {u_secs, :ok} =
       :timer.tc(fn ->
         rsp = Core.help(msg, state.commands)
         log_and_cache_recent(msg, rsp)
         send_response(msg, rsp)
       end)
 
-    Logger.info("[Sue] Processed msg in #{uSecs / 1_000_000}s")
+    Logger.info("[Sue] Processed msg in #{u_secs / 1_000_000}s")
     {:noreply, state}
   end
 
@@ -94,39 +96,42 @@ defmodule Sue do
   # Iterate through the documentation of our modules' functions. Called once by
   #   this GenServer, and again by Telegram's command setup.
   defp init_commands() do
-    for module <- Sue.Utils.list_modules_of_prefix("Elixir.Sue.Commands") do
-      with {_, _, _, _, _, _, func_docs} <- Code.fetch_docs(module) do
-        func_docs
-        |> Enum.map(fn func_doc_tuple ->
-          case func_doc_tuple do
-            {{:function, fname_a, _arity}, _num_lines, _, doc, _} ->
-              make_func_doc_tuple(module, Atom.to_string(fname_a), doc)
-
-            _ ->
-              []
-          end
-        end)
-      else
-        e ->
-          Logger.error("Couldn't initialize module #{module}: #{e |> inspect()}")
-          []
-      end
-    end
-    |> List.flatten()
+    "Elixir.Sue.Commands"
+    |> Sue.Utils.list_modules_of_prefix()
+    |> Enum.flat_map(&extract_command_docs/1)
     |> Enum.reduce(%{}, fn {module, fname, doc}, acc ->
       Map.put(acc, fname, {module, fname, doc})
     end)
   end
 
+  defp extract_command_docs(module) do
+    case Code.fetch_docs(module) do
+      {_, _, _, _, _, _, func_docs} ->
+        func_docs
+        |> Enum.map(&func_doc_entry(module, &1))
+        |> List.flatten()
+
+      e ->
+        Logger.error("Couldn't initialize module #{module}: #{inspect(e)}")
+        []
+    end
+  end
+
+  defp func_doc_entry(module, {{:function, fname_a, _arity}, _num_lines, _, doc, _}) do
+    make_func_doc_tuple(module, Atom.to_string(fname_a), doc)
+  end
+
+  defp func_doc_entry(_module, _), do: []
+
   def execute_in_background(commands, msg) do
-    {uSecs, :ok} =
+    {u_secs, :ok} =
       :timer.tc(fn ->
         rsp = execute_command(commands, msg)
         log_and_cache_recent(msg, rsp)
         send_response(msg, rsp)
       end)
 
-    Logger.info("[Sue] Processed msg in #{uSecs / 1_000_000}s")
+    Logger.info("[Sue] Processed msg in #{u_secs / 1_000_000}s")
 
     :ok
   end
@@ -140,21 +145,23 @@ defmodule Sue do
 
   defp execute_command(commands, %Message{account: %Account{id: account_id}} = msg) do
     # Check rate limit for sending commands - 5 cmds per 5 seconds
-    with :ok <- Sue.Limits.check_rate("sue-command:#{account_id}", @cmd_rate_limit) do
-      {module, f, _} =
-        case Map.get(commands, msg.command) do
-          nil -> {Defns, :calldefn, ""}
-          {module, fname, doc} -> {module, String.to_atom("c_" <> fname), doc}
-        end
+    case Sue.Limits.check_rate("sue-command:#{account_id}", @cmd_rate_limit) do
+      :ok ->
+        {module, f, _} =
+          case Map.get(commands, msg.command) do
+            nil -> {Defns, :calldefn, ""}
+            {module, fname, doc} -> {module, String.to_atom("c_" <> fname), doc}
+          end
 
-      apply(module, f, [msg])
-    else
-      :deny -> %Response{body: "Please slow down your requests."}
+        apply(module, f, [msg])
+
+      :deny ->
+        %Response{body: "Please slow down your requests."}
     end
   end
 
   # Message from Sue
-  @spec log_and_cache_recent(Message.t(), Response.t() | Attachment.t() | nil) :: :ok
+  @spec log_and_cache_recent(Message.t(), Response.t() | nil) :: :ok
   defp log_and_cache_recent(%Message{is_from_sue: true}, nil), do: :ok
 
   # Message/command from user
@@ -163,17 +170,6 @@ defmodule Sue do
       name: Account.friendly_name(msg.account),
       body: msg.body,
       is_from_sue: false,
-      is_from_gpt: false
-    })
-  end
-
-  # Sue response, attachment.
-  # TODO: Log enough info to be able to use the file.
-  defp log_and_cache_recent(msg, %Attachment{}) do
-    Sue.DB.RecentMessages.add(msg.chat.id, %{
-      name: "sue",
-      body: "<media>",
-      is_from_sue: true,
       is_from_gpt: false
     })
   end

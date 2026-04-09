@@ -1,4 +1,6 @@
 defmodule Sue.Models.Poll do
+  @moduledoc false
+
   @behaviour Subaru.Vertex
 
   @enforce_keys [:chat_id, :topic, :options, :votes, :interface]

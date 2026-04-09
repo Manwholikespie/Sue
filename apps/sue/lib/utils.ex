@@ -1,4 +1,6 @@
 defmodule Sue.Utils do
+  @moduledoc false
+
   @doc """
   Resolve a path to an absolute path.
   """

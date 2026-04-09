@@ -1,9 +1,10 @@
 defmodule Sue.Commands.Images do
+  @moduledoc false
+
   alias __MODULE__
   Module.register_attribute(__MODULE__, :is_persisted, persist: true)
   @is_persisted "is persisted"
 
-  require Logger
   alias Sue.Models.{Attachment, Response, Message}
 
   @media_path Path.join(:code.priv_dir(:sue), "media/")
@@ -70,7 +71,7 @@ defmodule Sue.Commands.Images do
   end
 
   defp validate_image(%Attachment{errors: []} = att) do
-    if Attachment.is_image?(att), do: :ok, else: {:error, :not_image}
+    if Attachment.image?(att), do: :ok, else: {:error, :not_image}
   end
 
   defp validate_image(%Attachment{errors: [{:size, _} | _]}), do: {:error, :too_big}
@@ -91,15 +92,10 @@ defmodule Sue.Commands.Images do
     %Attachment{filepath: outpath, downloaded: true}
   end
 
-  @spec random_image_from_dir(bitstring()) :: %Attachment{}
+  @spec random_image_from_dir(bitstring()) :: Attachment.t()
   defp random_image_from_dir(dir) do
     path = Path.join(@media_path, dir)
-
-    path
-    |> File.ls!()
-    |> Enum.random()
-    |> (fn image ->
-          %Attachment{filepath: Path.join(path, image), downloaded: true}
-        end).()
+    image = path |> File.ls!() |> Enum.random()
+    %Attachment{filepath: Path.join(path, image), downloaded: true}
   end
 end

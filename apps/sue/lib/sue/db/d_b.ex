@@ -1,7 +1,7 @@
 defmodule Sue.DB do
-  use GenServer
+  @moduledoc false
 
-  require Logger
+  use GenServer
 
   alias Sue.DB.Schema
   alias Sue.DB.Migrations

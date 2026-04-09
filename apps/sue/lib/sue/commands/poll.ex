@@ -1,8 +1,9 @@
 defmodule Sue.Commands.Poll do
+  @moduledoc false
+
   Module.register_attribute(__MODULE__, :is_persisted, persist: true)
   @is_persisted "is persisted"
 
-  require Logger
   alias Sue.Models.{Message, Response, Poll}
   alias Sue.DB
 
@@ -31,17 +32,15 @@ defmodule Sue.Commands.Poll do
 
   def c_vote(msg) do
     # Before voting on a poll, first confirm one exists for the current chat.
+    case DB.find_poll(msg.chat) do
+      {:ok, %Poll{interface: :platform}} ->
+        %Response{body: "Please use this messenger's custom polling interface."}
 
-    with {:ok, poll} <- DB.find_poll(msg.chat) do
-      case poll do
-        %Poll{interface: :platform} ->
-          %Response{body: "Please use this messenger's custom polling interface."}
+      {:ok, poll} ->
+        vote(poll, msg)
 
-        _p ->
-          vote(poll, msg)
-      end
-    else
-      {:error, :dne} -> %Response{body: "A poll does not exist for this chat."}
+      {:error, :dne} ->
+        %Response{body: "A poll does not exist for this chat."}
     end
   end
 
@@ -64,22 +63,17 @@ defmodule Sue.Commands.Poll do
 
   defp create_poll(msg, [topic | choices])
        when is_list(choices) and length(choices) <= 26 do
-    cond do
-      # Telegram's custom polling interface requires 10 options or less.
-      msg.platform == :telegram and length(choices) <= 10 ->
-        {:ok, p} =
-          Poll.new(msg.chat, topic, choices, :platform)
-          |> DB.add_poll(msg.chat.id)
+    # Telegram's custom polling interface requires 10 options or less.
+    interface =
+      if msg.platform == :telegram and length(choices) <= 10,
+        do: :platform,
+        else: :standard
 
-        poll_to_response(p, msg)
+    {:ok, p} =
+      Poll.new(msg.chat, topic, choices, interface)
+      |> DB.add_poll(msg.chat.id)
 
-      true ->
-        {:ok, p} =
-          Poll.new(msg.chat, topic, choices, :standard)
-          |> DB.add_poll(msg.chat.id)
-
-        poll_to_response(p, msg)
-    end
+    poll_to_response(p, msg)
   end
 
   defp create_poll(_msg, _) do

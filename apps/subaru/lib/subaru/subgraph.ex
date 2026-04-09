@@ -1,4 +1,6 @@
 defmodule Subaru.Subgraph do
+  @moduledoc false
+
   defstruct [:vs, :es]
 
   @type t() :: %__MODULE__{

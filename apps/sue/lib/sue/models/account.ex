@@ -1,4 +1,6 @@
 defmodule Sue.Models.Account do
+  @moduledoc false
+
   @behaviour Subaru.Vertex
 
   defstruct [

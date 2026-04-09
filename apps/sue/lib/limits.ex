@@ -1,4 +1,6 @@
 defmodule Sue.Limits do
+  @moduledoc false
+
   @doc """
   Checks if the action you wish to perform is within the bounds of the rate limit.
   If can_bypass, rate limit is ignored.

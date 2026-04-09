@@ -13,8 +13,6 @@ defmodule Sue.DB.RecentMessages do
 
   use GenServer
 
-  require Logger
-
   alias :queue, as: Queue
 
   import Subaru, only: [is_dbid: 1]

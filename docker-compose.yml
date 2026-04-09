@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   # sue_app:
   #   build:
@@ -15,7 +14,7 @@ services:
     ports:
       - "8529:8529"
     environment:
-      ARANGO_ROOT_PASSWORD: ${ARANGO_ROOT_PASSWORD}
+      ARANGO_ROOT_PASSWORD: ${ARANGODB_PASSWORD}
     volumes:
       - ./db_data:/var/lib/arangodb3
     restart: always

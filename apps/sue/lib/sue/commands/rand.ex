@@ -1,4 +1,6 @@
 defmodule Sue.Commands.Rand do
+  @moduledoc false
+
   Module.register_attribute(__MODULE__, :is_persisted, persist: true)
   @is_persisted "is persisted"
   alias Sue.Models.{Message, Response}

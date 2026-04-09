@@ -83,14 +83,14 @@ defmodule Subaru.Query do
   end
 
   @spec let(Query.t(), atom(), any()) :: Query.t()
-  def let(q, variableName, expression) do
-    item = {:let, variableName, expression}
+  def let(q, variable_name, expression) do
+    item = {:let, variable_name, expression}
     push(q, item)
   end
 
   @spec for(t, atom(), bitstring()) :: t
-  def for(q, variableName, collection) do
-    item = {:for, variableName, collection}
+  def for(q, variable_name, collection) do
+    item = {:for, variable_name, collection}
     push(q, item)
   end
 
@@ -157,8 +157,8 @@ defmodule Subaru.Query do
   This also updates the document with key "123456" in "people", assuming "people/123456" is provided as a key expression.
   """
   @spec update_with(t, bitstring(), any(), bitstring()) :: t
-  def update_with(q, keyExpression, doc, collection) do
-    item = {:update_with, keyExpression, doc, collection}
+  def update_with(q, key_expression, doc, collection) do
+    item = {:update_with, key_expression, doc, collection}
     push(q, item)
   end
 
@@ -179,13 +179,13 @@ defmodule Subaru.Query do
   |> Query.filter({:!=, "x.id", nil})
   |> Query.replace_with("x._key", "UNSET(x, ['id', 'platform'])", "sue_users")
   """
-  def replace_with(q, keyExpression, updatedoc, collection) do
-    item = {:replace_with, keyExpression, updatedoc, collection}
+  def replace_with(q, key_expression, updatedoc, collection) do
+    item = {:replace_with, key_expression, updatedoc, collection}
     push(q, item)
   end
 
-  def remove(q, variableName, collection) do
-    item = {:remove, variableName, collection}
+  def remove(q, variable_name, collection) do
+    item = {:remove, variable_name, collection}
     push(q, item)
   end
 
@@ -237,12 +237,10 @@ defmodule Subaru.Query do
   - `id`: The unique identifier of the document to retrieve. Can be provided with or without the collection name prefix.
   """
   def get(q, collection, id) do
-    cond do
-      String.contains?(id, "/") ->
-        return(q, "DOCUMENT(#{quoted(id)})")
-
-      true ->
-        return(q, "DOCUMENT(\"#{collection}/#{id}\")")
+    if String.contains?(id, "/") do
+      return(q, "DOCUMENT(#{quoted(id)})")
+    else
+      return(q, "DOCUMENT(\"#{collection}/#{id}\")")
     end
   end
 
@@ -300,22 +298,22 @@ defmodule Subaru.Query do
   defp gen(:empty, query), do: query
 
   # set var to query result
-  defp gen({:let, variableName, %Query{} = expression}, query) do
+  defp gen({:let, variable_name, %Query{} = expression}, query) do
     subquery = gen(expression)
     [expr_stmnt_head | expr_stmnt_tail] = subquery.statement
 
     query
     |> merge_bindvars(subquery.bindvars)
     |> merge_rw_colls(subquery.reads, subquery.writes)
-    |> add_statement("LET #{variableName} = " <> expr_stmnt_head)
+    |> add_statement("LET #{variable_name} = " <> expr_stmnt_head)
     |> add_statements(expr_stmnt_tail)
     |> gen()
   end
 
   # set var to literal
-  defp gen({:let, variableName, expression}, query) do
+  defp gen({:let, variable_name, expression}, query) do
     bindvar_id = generate_bindvar(expression)
-    statement = "LET #{variableName} = " <> bindvar_id
+    statement = "LET #{variable_name} = " <> bindvar_id
 
     query
     |> add_statement(statement)
@@ -372,26 +370,26 @@ defmodule Subaru.Query do
     |> gen()
   end
 
-  defp gen({:update_with, keyExpression, doc, collection}, query)
-       when is_bitstring(keyExpression) do
+  defp gen({:update_with, key_expression, doc, collection}, query)
+       when is_bitstring(key_expression) do
     bv_doc = generate_bindvar(doc)
     bv_coll = "@" <> generate_bindvar(collection)
 
-    # Directly handle the keyExpression format simplification
+    # Directly handle the key_expression format simplification
     formatted_key_expr =
-      if keyExpression =~ ~r/^\d+$/ do
-        # If the keyExpression is purely numeric, quote it
-        quoted(keyExpression)
+      if key_expression =~ ~r/^\d+$/ do
+        # If the key_expression is purely numeric, quote it
+        quoted(key_expression)
       else
-        # Check if keyExpression is in "collection/numericKey" format and extract the numeric part
-        case Regex.run(~r/^[\w-]+\/(\d+)$/, keyExpression) do
+        # Check if key_expression is in "collection/numericKey" format and extract the numeric part
+        case Regex.run(~r/^[\w-]+\/(\d+)$/, key_expression) do
           [_, numeric_id] ->
             # If so, use the numeric ID, quoted
             quoted(numeric_id)
 
           _ ->
-            # If not, use the keyExpression as is
-            keyExpression
+            # If not, use the key_expression as is
+            key_expression
         end
       end
 
@@ -406,10 +404,10 @@ defmodule Subaru.Query do
     |> gen()
   end
 
-  defp gen({:replace_with, keyExpression, doc, collection}, query) do
+  defp gen({:replace_with, key_expression, doc, collection}, query) do
     bv_coll = "@" <> generate_bindvar(collection)
 
-    statement = "REPLACE #{keyExpression} WITH #{doc} IN #{bv_coll}"
+    statement = "REPLACE #{key_expression} WITH #{doc} IN #{bv_coll}"
 
     query
     |> add_statement(statement)
@@ -418,9 +416,9 @@ defmodule Subaru.Query do
     |> gen()
   end
 
-  defp gen({:remove, variableName, collection}, query) do
+  defp gen({:remove, variable_name, collection}, query) do
     bv_coll = "@" <> generate_bindvar(collection)
-    statement = "REMOVE #{variableName} IN #{bv_coll}"
+    statement = "REMOVE #{variable_name} IN #{bv_coll}"
 
     query
     |> add_statement(statement)
@@ -429,9 +427,9 @@ defmodule Subaru.Query do
     |> gen()
   end
 
-  defp gen({:for, variableName, collection}, query) do
+  defp gen({:for, variable_name, collection}, query) do
     bv_coll = "@" <> generate_bindvar(collection)
-    statement = "FOR #{variableName} IN #{bv_coll}"
+    statement = "FOR #{variable_name} IN #{bv_coll}"
 
     query
     |> add_statement(statement)
@@ -551,7 +549,7 @@ defmodule Subaru.Query do
 
   defp helper_gen_statement(_, [], acc), do: acc
 
-  defp helper_gen_statement(query, [h | tail], acc) do
+  defp helper_gen_statement(%Query{} = query, [h | tail], acc) do
     {depth, context} =
       case h do
         "FOR " <> _ ->
@@ -564,12 +562,10 @@ defmodule Subaru.Query do
           {query.depth - 1, context_update(query, :pop)}
 
         _ ->
-          cond do
-            String.ends_with?(h, "FIRST(") ->
-              {query.depth + 1, context_update(query, :first)}
-
-            true ->
-              {query.depth, query.context}
+          if String.ends_with?(h, "FIRST(") do
+            {query.depth + 1, context_update(query, :first)}
+          else
+            {query.depth, query.context}
           end
       end
 
@@ -607,12 +603,12 @@ defmodule Subaru.Query do
   end
 
   @spec push(Query.t(), any()) :: Query.t()
-  defp push(query, item) do
+  defp push(%Query{} = query, item) do
     %Query{query | q: Queue.in(item, query.q)}
   end
 
   @spec pop(Query.t()) :: {Query.t(), any()}
-  defp pop(query) do
+  defp pop(%Query{} = query) do
     case Queue.out(query.q) do
       {{:value, item}, tail} ->
         {%Query{query | q: tail}, item}
@@ -623,39 +619,39 @@ defmodule Subaru.Query do
   end
 
   @spec add_statement(Query.t(), binary()) :: Query.t()
-  defp add_statement(query, statement) do
+  defp add_statement(%Query{} = query, statement) do
     add_statements(query, [statement])
   end
 
-  @spec add_statement(Query.t(), [binary()]) :: Query.t()
-  defp add_statements(query, statements) do
+  @spec add_statements(Query.t(), [binary()]) :: Query.t()
+  defp add_statements(%Query{} = query, statements) do
     %Query{query | statement: query.statement ++ statements}
   end
 
   @spec add_bindvar(t, bitstring(), any()) :: t
-  defp add_bindvar(query, "@" <> key, value) do
+  defp add_bindvar(%Query{} = query, "@" <> key, value) do
     %Query{query | bindvars: Map.put(query.bindvars, key, value)}
   end
 
   @spec merge_bindvars(t, map()) :: t
-  defp merge_bindvars(query, bindvars) do
+  defp merge_bindvars(%Query{} = query, bindvars) do
     %Query{query | bindvars: Map.merge(query.bindvars, bindvars)}
   end
 
-  defp add_write_coll(query, coll) do
+  defp add_write_coll(%Query{} = query, coll) do
     %Query{query | writes: MapSet.put(query.writes, coll)}
   end
 
-  defp add_read_coll(query, coll) do
+  defp add_read_coll(%Query{} = query, coll) do
     %Query{query | reads: MapSet.put(query.reads, coll)}
   end
 
   @spec add_read_colls(t(), [bitstring()]) :: t
-  defp add_read_colls(query, colls) do
+  defp add_read_colls(%Query{} = query, colls) do
     %Query{query | reads: MapSet.union(query.reads, MapSet.new(colls))}
   end
 
-  defp merge_rw_colls(query, reads, writes) do
+  defp merge_rw_colls(%Query{} = query, reads, writes) do
     %Query{
       query
       | reads: MapSet.union(query.reads, reads),
@@ -695,8 +691,6 @@ defmodule Subaru.Query do
 
   defp map_to_str(m) do
     "{ " <>
-      (m
-       |> Enum.map(fn {k, v} -> "#{k}: \"#{v}\"" end)
-       |> Enum.join(", ")) <> " }"
+      Enum.map_join(m, ", ", fn {k, v} -> "#{k}: \"#{v}\"" end) <> " }"
   end
 end

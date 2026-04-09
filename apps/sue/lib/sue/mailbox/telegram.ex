@@ -1,4 +1,6 @@
 defmodule Sue.Mailbox.Telegram do
+  @moduledoc false
+
   use Telegex.Polling.GenHandler
 
   require Logger
@@ -127,7 +129,7 @@ defmodule Sue.Mailbox.Telegram do
             # Last resort: split at character boundary with hyphen
             # Take max_length - 1 to leave room for hyphen
             split_at = @telegram_max_length - 1
-            <<chunk::binary-size(split_at), rest::binary>> = text
+            <<chunk::binary-size(^split_at), rest::binary>> = text
             {chunk <> "-", rest}
         end
     end
@@ -148,8 +150,10 @@ defmodule Sue.Mailbox.Telegram do
     cond do
       remaining == 0 and last_delim_pos > 0 ->
         # Reached end of text, use last delimiter position
-        <<chunk::binary-size(last_delim_pos), _delim::binary-size(byte_size(delimiter)),
-          rest::binary>> = text
+        delim_size = byte_size(delimiter)
+
+        <<chunk::binary-size(^last_delim_pos), _delim::binary-size(^delim_size), rest::binary>> =
+          text
 
         {:ok, chunk, rest}
 
@@ -160,8 +164,10 @@ defmodule Sue.Mailbox.Telegram do
       current_pos >= @telegram_max_length ->
         # Exceeded limit, use last known delimiter position
         if last_delim_pos > 0 do
-          <<chunk::binary-size(last_delim_pos), _delim::binary-size(byte_size(delimiter)),
-            rest::binary>> = text
+          delim_size = byte_size(delimiter)
+
+          <<chunk::binary-size(^last_delim_pos), _delim::binary-size(^delim_size), rest::binary>> =
+            text
 
           {:ok, chunk, rest}
         else
@@ -173,7 +179,7 @@ defmodule Sue.Mailbox.Telegram do
         delim_size = byte_size(delimiter)
 
         case text do
-          <<_::binary-size(current_pos), ^delimiter::binary-size(delim_size), _::binary>> ->
+          <<_::binary-size(^current_pos), ^delimiter::binary-size(^delim_size), _::binary>> ->
             # Found delimiter, update last known position and continue
             find_split_point_binary(text, delimiter, current_pos, current_pos + delim_size)
 
@@ -195,7 +201,7 @@ defmodule Sue.Mailbox.Telegram do
 
       [{pos, len}] ->
         # Split at the last whitespace found
-        <<chunk::binary-size(pos), _ws::binary-size(len), rest::binary>> = text
+        <<chunk::binary-size(^pos), _ws::binary-size(^len), rest::binary>> = text
         {:ok, chunk, rest}
 
       _ ->

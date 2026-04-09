@@ -1,4 +1,6 @@
 defmodule Sue.Models.Chat do
+  @moduledoc false
+
   alias __MODULE__
   alias Sue.Models.Platform
 

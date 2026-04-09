@@ -2,7 +2,6 @@ defmodule Sue.Application do
   @moduledoc false
 
   use Application
-  require Logger
 
   @platforms Application.compile_env(:sue, :platforms, [])
 

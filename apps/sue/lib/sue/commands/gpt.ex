@@ -1,4 +1,6 @@
 defmodule Sue.Commands.Gpt do
+  @moduledoc false
+
   alias Sue.Models.{Message, Response, Attachment, Account}
 
   @gpt_rate_limit Application.compile_env(:sue, :gpt_rate_limit)
@@ -14,13 +16,15 @@ defmodule Sue.Commands.Gpt do
 
   def c_gpt(%Message{args: args, chat: chat, account: account}) do
     # Check rate limit for using gpt command: 50/day
-    with :ok <- Sue.Limits.check_rate("gpt:#{account.id}", @gpt_rate_limit, account.is_premium) do
-      %Response{
-        body: Sue.AI.chat_completion(args, chat, account),
-        is_from_gpt: true
-      }
-    else
-      :deny -> %Response{body: "Please slow down your requests. Try again in 24 hours."}
+    case Sue.Limits.check_rate("gpt:#{account.id}", @gpt_rate_limit, account.is_premium) do
+      :ok ->
+        %Response{
+          body: Sue.AI.chat_completion(args, chat, account),
+          is_from_gpt: true
+        }
+
+      :deny ->
+        %Response{body: "Please slow down your requests. Try again in 24 hours."}
     end
   end
 
@@ -33,14 +37,15 @@ defmodule Sue.Commands.Gpt do
   end
 
   def c_emoji(%Message{args: prompt, account: %Account{id: account_id, is_premium: is_premium}}) do
-    with :ok <- Sue.Limits.check_rate("replicate-8s:#{account_id}", @sd_rate_limit, is_premium) do
-      with {:ok, url} <- Sue.AI.gen_image_emoji(prompt) do
-        %Response{attachments: [Attachment.from_url(url)]}
-      else
-        {:error, error_msg} -> %Response{body: error_msg}
-      end
-    else
-      :deny -> %Response{body: "Please slow down your requests. Try again in 24 hours."}
+    case Sue.Limits.check_rate("replicate-8s:#{account_id}", @sd_rate_limit, is_premium) do
+      :ok ->
+        case Sue.AI.gen_image_emoji(prompt) do
+          {:ok, url} -> %Response{attachments: [Attachment.from_url(url)]}
+          {:error, error_msg} -> %Response{body: error_msg}
+        end
+
+      :deny ->
+        %Response{body: "Please slow down your requests. Try again in 24 hours."}
     end
   end
 
@@ -53,14 +58,15 @@ defmodule Sue.Commands.Gpt do
   end
 
   def c_sd(%Message{args: prompt, account: %Account{id: account_id, is_premium: is_premium}}) do
-    with :ok <- Sue.Limits.check_rate("replicate-8s:#{account_id}", @sd_rate_limit, is_premium) do
-      with {:ok, url} <- Sue.AI.gen_image_sd(prompt) do
-        %Response{attachments: [Attachment.from_url(url)]}
-      else
-        {:error, error_msg} -> %Response{body: error_msg}
-      end
-    else
-      :deny -> %Response{body: "Please slow down your requests. Try again in 24 hours."}
+    case Sue.Limits.check_rate("replicate-8s:#{account_id}", @sd_rate_limit, is_premium) do
+      :ok ->
+        case Sue.AI.gen_image_sd(prompt) do
+          {:ok, url} -> %Response{attachments: [Attachment.from_url(url)]}
+          {:error, error_msg} -> %Response{body: error_msg}
+        end
+
+      :deny ->
+        %Response{body: "Please slow down your requests. Try again in 24 hours."}
     end
   end
 end

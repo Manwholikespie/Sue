@@ -1,4 +1,6 @@
 defmodule Sue.AI do
+  @moduledoc false
+
   use GenServer
 
   require Logger
@@ -85,15 +87,12 @@ defmodule Sue.AI do
       when model_version in @allowed_models do
     Logger.debug("Running chat_completion with #{model_version}")
 
-    with {:ok, response} <-
-           OpenAI.chat_completion(
-             model: model_version,
-             messages: messages
-           ) do
-      [%{"message" => %{"content" => content}}] = response.choices
-      Logger.debug("GPT response: " <> content)
-      content
-    else
+    case OpenAI.chat_completion(model: model_version, messages: messages) do
+      {:ok, response} ->
+        [%{"message" => %{"content" => content}}] = response.choices
+        Logger.debug("GPT response: " <> content)
+        content
+
       {:error, :timeout} ->
         "Sorry, I timed out. Please try later, maybe additionally asking I keep my response short."
 

@@ -43,7 +43,7 @@ defmodule DesuWeb do
         layouts: [html: DesuWeb.Layouts]
 
       import Plug.Conn
-      import DesuWeb.Gettext
+      use Gettext, backend: DesuWeb.Gettext
 
       unquote(verified_routes())
     end
@@ -85,7 +85,7 @@ defmodule DesuWeb do
       import Phoenix.HTML
       # Core UI components and translation
       import DesuWeb.CoreComponents
-      import DesuWeb.Gettext
+      use Gettext, backend: DesuWeb.Gettext
 
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS

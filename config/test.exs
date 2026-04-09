@@ -12,4 +12,9 @@ config :logger, level: :debug
 
 config :sue,
   cmd_rate_limit: {:timer.seconds(5), 5000},
-  query_debug: false
+  query_debug: false,
+  # Tests use Message.from_debug/1 and Sue.debug_blocking_process_message/1
+  # exclusively. Starting real platform adapters pulls in iMessage DB access
+  # (needs Full Disk Access), a live Discord shard, and Telegram polling —
+  # all noisy and slow in CI.
+  platforms: [:debug]

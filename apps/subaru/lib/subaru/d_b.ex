@@ -1,4 +1,6 @@
 defmodule Subaru.DB do
+  @moduledoc false
+
   use GenServer
 
   require Logger

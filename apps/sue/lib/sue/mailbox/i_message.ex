@@ -1,4 +1,6 @@
 defmodule Sue.Mailbox.IMessage do
+  @moduledoc false
+
   use GenServer
 
   require Logger
@@ -139,32 +141,35 @@ defmodule Sue.Mailbox.IMessage do
   defp get_current_max_rowid() do
     # Check to see if we have one stored.
     case Subaru.Cache.get!(@cache_table, "imsg_max_rowid") do
-      nil ->
-        # Haven't seen it before, use the current max ROWID so we only process new messages
-        case Imessaged.DB.connect() do
-          {:ok, conn} ->
-            result =
-              case Imessaged.DB.query(conn, "SELECT MAX(ROWID) FROM message;", []) do
-                {:ok, [[rowid]]} when is_integer(rowid) ->
-                  Subaru.Cache.put(@cache_table, "imsg_max_rowid", rowid)
-                  Logger.info("Starting iMessage polling from ROWID #{rowid}")
-                  rowid
+      nil -> query_imessage_max_rowid()
+      rowid -> rowid
+    end
+  end
 
-                _ ->
-                  Logger.warning("Could not get max ROWID from iMessage DB, starting from 0")
-                  0
-              end
-
-            Imessaged.DB.disconnect(conn)
-            result
-
-          {:error, _} ->
-            Logger.warning("Could not connect to iMessage DB, starting from 0")
-            0
-        end
-
-      rowid ->
+  # Haven't seen it before, use the current max ROWID so we only process new messages
+  defp query_imessage_max_rowid() do
+    case Imessaged.DB.connect() do
+      {:ok, conn} ->
+        rowid = fetch_max_rowid(conn)
+        Imessaged.DB.disconnect(conn)
         rowid
+
+      {:error, _} ->
+        Logger.warning("Could not connect to iMessage DB, starting from 0")
+        0
+    end
+  end
+
+  defp fetch_max_rowid(conn) do
+    case Imessaged.DB.query(conn, "SELECT MAX(ROWID) FROM message;", []) do
+      {:ok, [[rowid]]} when is_integer(rowid) ->
+        Subaru.Cache.put(@cache_table, "imsg_max_rowid", rowid)
+        Logger.info("Starting iMessage polling from ROWID #{rowid}")
+        rowid
+
+      _ ->
+        Logger.warning("Could not get max ROWID from iMessage DB, starting from 0")
+        0
     end
   end
 

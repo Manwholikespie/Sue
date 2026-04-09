@@ -1,6 +1,7 @@
 defmodule Sue.Commands.Images.Motivate do
+  @moduledoc false
+
   alias Sue.Utils
-  require Logger
 
   @type image() :: Vix.Vips.Image.t()
 

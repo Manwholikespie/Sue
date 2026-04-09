@@ -1,9 +1,10 @@
 defmodule Sue.Commands.Core do
+  @moduledoc false
+
   Module.register_attribute(__MODULE__, :is_persisted, persist: true)
   @is_persisted "is persisted"
 
   alias Sue.Models.{Message, Response, Account, Chat}
-  require Logger
 
   @doc """
   Make sure Sue is alive and well.
@@ -54,8 +55,7 @@ defmodule Sue.Commands.Core do
   def c_h_recentmessages(%Message{chat: %Chat{id: chat_id}}) do
     recent_messages =
       Sue.DB.RecentMessages.get(chat_id)
-      |> Enum.map(fn m -> "- " <> String.slice(m.body, 0, 20) end)
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", fn m -> "- " <> String.slice(m.body, 0, 20) end)
 
     %Response{
       body: if(recent_messages == "", do: "empty", else: recent_messages)
@@ -63,9 +63,8 @@ defmodule Sue.Commands.Core do
   end
 
   def c_h_ratetest(%Message{account: %Account{id: account_id}}) do
-    with :ok <- Sue.Limits.check_rate("ratetest:#{account_id}", {:timer.minutes(1), 2}) do
-      %Response{body: "still good for twice per minute."}
-    else
+    case Sue.Limits.check_rate("ratetest:#{account_id}", {:timer.minutes(1), 2}) do
+      :ok -> %Response{body: "still good for twice per minute."}
       :deny -> %Response{body: "deny"}
     end
   end
@@ -81,8 +80,7 @@ defmodule Sue.Commands.Core do
         commands
         |> Map.keys()
         |> Enum.filter(fn name -> not String.starts_with?(name, "h_") end)
-        |> Enum.map(fn fname -> "!#{fname}" end)
-        |> Enum.join("\n")
+        |> Enum.map_join("\n", fn fname -> "!#{fname}" end)
     }
   end
 

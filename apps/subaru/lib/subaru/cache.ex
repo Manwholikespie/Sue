@@ -1,4 +1,6 @@
 defmodule Subaru.Cache do
+  @moduledoc false
+
   use GenServer
 
   # @table_userchats :user_chat_edges_cache

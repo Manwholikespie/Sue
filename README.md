@@ -171,10 +171,6 @@ end
 
 1. Submit an issue and I'll put together some instructions. Basically, just look at the tests. They do a good job of explaining most of Sue's major components, even if there isn't a test for everything.
 
-## Known Issues
-
-- Image functions stopped working in Telegram. I think there's a new Telegram client for Elixir that I'll probably switch to.
-
 ## Special Thanks
 
 - Thanks for [Zeke's](https://github.com/ZekeSnider) work on [Jared](https://github.com/ZekeSnider/Jared). Your applescript files were cleaner than mine. Good thinking with sqlite.

@@ -1,4 +1,6 @@
 defmodule Sue.Models.Response do
+  @moduledoc false
+
   alias __MODULE__
 
   @type t() :: %__MODULE__{}

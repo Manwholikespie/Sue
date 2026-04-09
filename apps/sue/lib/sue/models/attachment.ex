@@ -1,4 +1,6 @@
 defmodule Sue.Models.Attachment do
+  @moduledoc false
+
   alias __MODULE__
 
   defstruct [
@@ -122,12 +124,12 @@ defmodule Sue.Models.Attachment do
   def download(_), do: {:error, :invalid_attachment}
 
   # Helper functions for checking if it's an image
-  @spec is_image?(t()) :: boolean()
-  def is_image?(%Attachment{mime_type: mime_type}) when is_bitstring(mime_type) do
+  @spec image?(t()) :: boolean()
+  def image?(%Attachment{mime_type: mime_type}) when is_bitstring(mime_type) do
     mime_type |> String.starts_with?("image/") and not (mime_type |> String.ends_with?("gif"))
   end
 
-  def is_image?(_), do: false
+  def image?(_), do: false
 
   # Helper for checking if it's a valid file
   @spec valid?(t()) :: boolean()

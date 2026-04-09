@@ -17,7 +17,7 @@ defmodule DesuWeb.CoreComponents do
   use Phoenix.Component
 
   alias Phoenix.LiveView.JS
-  import DesuWeb.Gettext
+  use Gettext, backend: DesuWeb.Gettext
 
   @doc """
   Renders a modal.

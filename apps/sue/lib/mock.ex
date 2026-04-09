@@ -1,4 +1,6 @@
 defmodule Sue.Mock do
+  @moduledoc false
+
   alias Sue.Models.{Account, PlatformAccount, Chat}
 
   @spec mock_paccount_account() :: {PlatformAccount.t(), Account.t()}

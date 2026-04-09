@@ -1,5 +1,6 @@
 defmodule Subaru do
-  require Logger
+  @moduledoc false
+
   alias Subaru.Query
 
   # Database Result

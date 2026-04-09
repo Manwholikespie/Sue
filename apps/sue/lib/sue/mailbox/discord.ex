@@ -1,4 +1,6 @@
 defmodule Sue.Mailbox.Discord do
+  @moduledoc false
+
   use Nostrum.Consumer
 
   require Logger
@@ -12,10 +14,6 @@ defmodule Sue.Mailbox.Discord do
   def handle_event({:MESSAGE_CREATE, dmsg, _ws_state}) do
     msg = Message.from_discord(dmsg)
     Sue.process_messages([msg])
-  end
-
-  def handle_event(_event) do
-    :noop
   end
 
   def send_response(_msg, %Response{body: nil, attachments: []}) do
@@ -38,9 +36,8 @@ defmodule Sue.Mailbox.Discord do
   end
 
   def send_response_text(msg, rsp) do
-    with {:ok, _} <- NostrumMessage.create(msg.metadata.channel_id, content: rsp.body) do
-      :ok
-    else
+    case NostrumMessage.create(msg.metadata.channel_id, content: rsp.body) do
+      {:ok, _} -> :ok
       error -> Logger.error(error |> inspect())
     end
   end

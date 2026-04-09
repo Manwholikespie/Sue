@@ -1,4 +1,6 @@
 defmodule Sue.DB.Schema do
+  @moduledoc false
+
   alias Sue.Models.{Account, Chat, Defn, PlatformAccount, Poll}
 
   @ecoll_sue_user_in_chat "sue_user_in_chat"
