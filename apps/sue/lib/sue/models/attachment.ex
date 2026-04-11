@@ -2,6 +2,7 @@ defmodule Sue.Models.Attachment do
   @moduledoc false
 
   alias __MODULE__
+  alias Sue.Mailbox.Telegram
 
   defstruct [
     :id,
@@ -143,29 +144,7 @@ defmodule Sue.Models.Attachment do
 
   # Download Telegram file to local path
   defp download_telegram_file(file_id, original_mime_type) do
-    case Telegex.get_file(file_id) do
-      {:ok, %Telegex.Type.File{file_path: file_path, file_size: file_size}} ->
-        token = Telegex.Global.token()
-        download_url = "https://api.telegram.org/file/bot#{token}/#{file_path}"
-
-        filename = Sue.Utils.unique_string()
-        filepath = Path.join(@tmp_path, filename <> Path.extname(file_path))
-
-        case HTTPoison.get(download_url) do
-          {:ok, %HTTPoison.Response{body: body, headers: headers}} ->
-            File.write!(filepath, body)
-
-            # Prefer original mime type from Telegram if available, fallback to headers
-            mime_type = original_mime_type || extract_mime_from_headers(headers) || @default_mime
-            {:ok, filepath, file_size, mime_type}
-
-          {:error, %HTTPoison.Error{reason: reason}} ->
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    Telegram.download_file(file_id, original_mime_type)
   end
 
   # Download URL to local path
@@ -174,22 +153,40 @@ defmodule Sue.Models.Attachment do
     filepath = Path.join(@tmp_path, filename <> Path.extname(url))
 
     case HTTPoison.get(url) do
-      {:ok, %HTTPoison.Response{body: body, headers: headers}} ->
+      {:ok, %HTTPoison.Response{status_code: status, body: body, headers: headers}}
+      when status in 200..299 ->
         File.write!(filepath, body)
         fsize = byte_size(body)
         mime_type = extract_mime_from_headers(headers) || @default_mime
         {:ok, filepath, fsize, mime_type}
 
-      {:error, %HTTPoison.Error{reason: reason}} ->
-        {:error, reason}
+      {:ok, %HTTPoison.Response{status_code: status}} ->
+        {:error, {:http_status, status}}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
 
   defp extract_mime_from_headers(headers) do
     Enum.find_value(headers, fn
-      {"Content-Type", value} -> value |> String.split(";") |> List.first()
-      _ -> nil
+      {name, [value | _rest]} when is_binary(name) and is_binary(value) ->
+        extract_header_mime(name, value)
+
+      {name, value} when is_binary(name) and is_binary(value) ->
+        extract_header_mime(name, value)
+
+      _ ->
+        nil
     end)
+  end
+
+  defp extract_header_mime(name, value) do
+    if String.downcase(name) == "content-type" do
+      value
+      |> String.split(";")
+      |> List.first()
+    end
   end
 
   defp check_size_for_errors(nil), do: []

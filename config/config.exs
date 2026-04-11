@@ -85,8 +85,11 @@ config :sue,
   gpt_rate_limit: {:timer.hours(24), 50},
   sd_rate_limit: {:timer.hours(24), 17}
 
-config :telegex,
-  caller_adapter: {Finch, [receive_timeout: 5 * 1000]}
+config :ex_gram,
+  adapter: ExGram.Adapter.Tesla,
+  json_engine: Jason
+
+config :tesla, adapter: Tesla.Adapter.Gun
 
 config :subaru,
   dbname: "subaru_#{config_env()}"

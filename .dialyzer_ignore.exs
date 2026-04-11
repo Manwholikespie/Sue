@@ -61,7 +61,6 @@
   {"lib/sue/commands/images.ex", :invalid_contract},
   {"lib/sue/mailbox/discord.ex", :unknown_function},
   {"lib/sue/mailbox/i_message.ex", :no_return},
-  {"lib/sue/mailbox/telegram.ex", :no_return},
 
   # =====================================================================
   # Test / mock utilities

@@ -1,92 +1,146 @@
 defmodule Sue.Mailbox.Telegram do
   @moduledoc false
 
-  use Telegex.Polling.GenHandler
-
+  alias ExGram.Model.InputPollOption
   require Logger
 
-  alias Sue.Models.{Message, Response, Attachment}
+  alias Sue.Models.{Attachment, Message, Response}
 
   @telegram_max_length 4096
+  @bot_name :sue_bot
+  @tmp_path System.tmp_dir!()
+  @default_mime "application/octet-stream"
 
-  @impl true
-  def on_boot() do
-    # delete any potential webhook
-    {:ok, true} = Telegex.delete_webhook()
-
-    # create configuration (can be empty, because there are default values)
-    # allowed_updates = ["message"]
-    %Telegex.Polling.Config{allowed_updates: []}
-  end
-
-  @impl true
-  def on_update(update) do
-    # consume the update
-    Logger.debug(update |> inspect(pretty: true, limit: :infinity))
-    message = Message.from_telegram2(update.message)
-    Sue.process_messages([message])
-
-    :ok
-  end
-
-  def send_response(_msg, %Response{body: nil, attachments: []}) do
-    # Likely already sent custom response (ex: polls)
-    :ok
-  end
+  @spec send_response(Message.t(), Response.t()) :: :ok | {:error, term()}
+  def send_response(_msg, %Response{body: nil, attachments: []}), do: :ok
 
   def send_response(msg, %Response{attachments: []} = rsp) do
-    # No attachments
     send_response_text(msg, rsp)
   end
 
   def send_response(msg, %Response{body: nil, attachments: atts}) do
-    # No text
     send_response_attachments(msg, atts)
   end
 
   def send_response(%Message{} = msg, %Response{attachments: atts} = rsp) do
-    send_response_text(msg, rsp)
-    send_response_attachments(msg, atts)
+    with :ok <- send_response_text(msg, rsp) do
+      send_response_attachments(msg, atts)
+    end
   end
 
-  # TODO: REPLACE
-  @spec send_response_text(Message.t(), Response.t()) :: :ok
-  def send_response_text(msg, rsp) do
-    {_platform, id} = msg.chat.platform_id
+  @spec send_response_text(Message.t(), Response.t()) :: :ok | {:error, term()}
+  def send_response_text(_msg, %Response{body: nil}), do: :ok
+  def send_response_text(_msg, %Response{body: ""}), do: :ok
 
-    rsp.body
-    |> split_message()
-    |> Enum.each(fn chunk ->
-      Telegex.send_message(id, chunk)
-    end)
+  def send_response_text(msg, %Response{body: body}) do
+    case send_text(chat_id(msg), body) do
+      {:ok, _messages} ->
+        :ok
 
-    :ok
+      {:error, error} ->
+        log_transport_error(:send_message, error)
+        {:error, error}
+    end
   end
 
   def send_response_attachments(_msg, []), do: :ok
 
-  # TODO: REPLACE
-  def send_response_attachments(msg, [att | atts]) do
-    {_platform, id} = msg.chat.platform_id
+  @spec send_response_attachments(Message.t(), [Attachment.t()]) :: :ok | {:error, term()}
+  def send_response_attachments(msg, attachments) do
+    attachments
+    |> Enum.reduce_while(:ok, fn att, :ok ->
+      case send_photo(chat_id(msg), att) do
+        {:ok, _message} ->
+          {:cont, :ok}
 
-    if Attachment.has_url?(att) do
-      Telegex.send_photo(id, att.url)
-    else
-      url = "https://api.telegram.org/bot#{Telegex.Global.token()}/sendPhoto"
-
-      form = [
-        {"chat_id", to_string(id)},
-        {:file, att.filepath,
-         {"form-data", [{"name", "photo"}, {"filename", Path.basename(att.filepath)}]}, []}
-      ]
-
-      # Make the request
-      with {:ok, _response} <- HTTPoison.post(url, {:multipart, form}) do
-        :ok
+        {:error, error} ->
+          log_transport_error(:send_photo, error)
+          {:halt, {:error, error}}
       end
-    end
+    end)
+  end
 
-    send_response_attachments(msg, atts)
+  @spec send_text(bitstring() | integer(), String.t()) ::
+          {:ok, [ExGram.Model.Message.t()]} | {:error, term()}
+  def send_text(_chat_id, ""), do: {:ok, []}
+
+  def send_text(chat_id, text) when is_binary(text) do
+    text
+    |> split_message()
+    |> Enum.reduce_while({:ok, []}, fn chunk, {:ok, acc} ->
+      case ExGram.send_message(chat_id, chunk, bot: @bot_name) do
+        {:ok, message} ->
+          {:cont, {:ok, [message | acc]}}
+
+        {:error, error} ->
+          {:halt, {:error, error}}
+      end
+    end)
+    |> case do
+      {:ok, messages} -> {:ok, Enum.reverse(messages)}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  @spec edit_text(bitstring() | integer(), integer(), String.t(), keyword()) ::
+          {:ok, ExGram.Model.Message.t()} | {:error, term()}
+  def edit_text(chat_id, message_id, text, opts \\ []) when is_binary(text) do
+    opts =
+      Keyword.merge(
+        [chat_id: chat_id, message_id: message_id, bot: @bot_name],
+        opts
+      )
+
+    ExGram.edit_message_text(text, opts)
+  end
+
+  @spec send_photo(bitstring() | integer(), Attachment.t()) ::
+          {:ok, ExGram.Model.Message.t()} | {:error, term()}
+  def send_photo(chat_id, %Attachment{} = att) do
+    cond do
+      Attachment.has_url?(att) ->
+        ExGram.send_photo(chat_id, att.url, bot: @bot_name)
+
+      is_binary(att.filepath) ->
+        ExGram.send_photo(chat_id, {:file, att.filepath}, bot: @bot_name)
+
+      true ->
+        {:error, :invalid_attachment}
+    end
+  end
+
+  @spec send_poll(bitstring() | integer(), String.t(), [String.t() | InputPollOption.t()]) ::
+          {:ok, ExGram.Model.Message.t()} | {:error, term()}
+  def send_poll(chat_id, topic, options) when is_list(options) do
+    options =
+      Enum.map(options, fn
+        %InputPollOption{} = option -> option
+        option when is_binary(option) -> %InputPollOption{text: option}
+      end)
+
+    ExGram.send_poll(chat_id, topic, options, is_anonymous: false, bot: @bot_name)
+  end
+
+  @spec get_file(String.t()) :: {:ok, ExGram.Model.File.t()} | {:error, term()}
+  def get_file(file_id) do
+    ExGram.get_file(file_id, bot: @bot_name)
+  end
+
+  @spec download_file(String.t(), String.t() | nil) ::
+          {:ok, String.t(), integer() | nil, String.t()} | {:error, term()}
+  def download_file(file_id, original_mime_type \\ nil) do
+    with {:ok, %ExGram.Model.File{file_path: file_path, file_size: file_size} = file} <-
+           get_file(file_id),
+         url <- ExGram.File.file_url(file, bot: @bot_name),
+         filename <- Sue.Utils.unique_string(),
+         filepath <- Path.join(@tmp_path, filename <> Path.extname(file_path)),
+         {:ok, body, headers} <- http_get(url),
+         :ok <- File.write(filepath, body) do
+      mime_type = original_mime_type || extract_mime_from_headers(headers) || @default_mime
+      {:ok, filepath, file_size, mime_type}
+    else
+      {:error, error} -> {:error, error}
+    end
   end
 
   # Split a message into chunks that fit within Telegram's character limit
@@ -207,5 +261,48 @@ defmodule Sue.Mailbox.Telegram do
       _ ->
         :too_large
     end
+  end
+
+  defp chat_id(%Message{chat: %{platform_id: {_platform, id}}}), do: id
+
+  defp http_get(url) do
+    case HTTPoison.get(url) do
+      {:ok, %HTTPoison.Response{status_code: status, body: body, headers: headers}}
+      when status in 200..299 ->
+        {:ok, body, headers}
+
+      {:ok, %HTTPoison.Response{status_code: status}} ->
+        {:error, {:http_status, status}}
+
+      {:error, error} ->
+        {:error, error}
+    end
+  end
+
+  defp extract_mime_from_headers(headers) do
+    Enum.find_value(headers, fn
+      {name, [value | _rest]} ->
+        header_mime(name, value)
+
+      {name, value} ->
+        header_mime(name, value)
+
+      _ ->
+        nil
+    end)
+  end
+
+  defp header_mime(name, value) when is_binary(name) and is_binary(value) do
+    if String.downcase(name) == "content-type" do
+      value
+      |> String.split(";")
+      |> List.first()
+    end
+  end
+
+  defp header_mime(_name, _value), do: nil
+
+  defp log_transport_error(action, error) do
+    Logger.error("[Telegram] #{action} failed: #{inspect(error)}")
   end
 end

@@ -25,7 +25,8 @@ defmodule Sue.Application do
 
     children_telegram =
       if Sue.Utils.contains?(@platforms, :telegram) do
-        [Sue.Mailbox.Telegram]
+        token = Application.fetch_env!(:sue, :telegram_token)
+        [{Sue.Mailbox.Telegram.Supervisor, [token: token]}]
       else
         []
       end

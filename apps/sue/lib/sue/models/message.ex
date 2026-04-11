@@ -133,49 +133,31 @@ defmodule Sue.Models.Message do
 
   def from_telegram2(msg) do
     {command, args, body} =
-      command_args_from_body(:telegram, msg.text || msg.caption || "")
+      command_args_from_body(:telegram, telegram_text(msg))
 
     command =
       parse_command_potentially_with_botname_suffix(command)
 
-    paccount =
-      %PlatformAccount{platform_id: {:telegram, msg.from.id}}
-      |> PlatformAccount.resolve()
+    build_telegram_message(command, args, body, msg)
+  end
 
-    chat =
-      %Chat{
-        platform_id: {:telegram, msg.chat.id},
-        is_direct: msg.chat.type == "private"
-      }
-      |> Chat.resolve()
+  def from_telegram_command(cmd, msg) do
+    command =
+      cmd
+      |> to_string()
+      |> String.downcase()
+      |> parse_command_potentially_with_botname_suffix()
 
-    account = Account.from_paccount(paccount)
+    args = telegram_text(msg)
 
-    %Message{
-      platform: :telegram,
-      id: "#{msg.chat.id}.#{msg.message_id}",
-      #
-      paccount: paccount,
-      chat: chat,
-      account: account,
-      #
-      body: body,
-      time: DateTime.from_unix!(msg.date),
-      #
-      is_from_sue: false,
-      is_ignorable: command == "" or account.is_ignored or chat.is_ignored,
+    body =
+      if args == "" do
+        "/#{command}"
+      else
+        "/#{command} #{args}"
+      end
 
-      # either in the message sent, or the message referenced in a reply
-      has_attachments:
-        Map.get(msg, :photo) != nil or
-          Map.get(msg, :document) != nil or
-          Map.get(msg, :reply_to_message, %{})[:photo] != nil or
-          Map.get(msg, :reply_to_message, %{})[:document] != nil,
-      command: command,
-      args: args
-    }
-    |> construct_attachments(msg)
-    |> add_account_and_chat_to_graph()
+    build_telegram_message(command, args, body, msg)
   end
 
   def from_discord(msg) do
@@ -303,6 +285,51 @@ defmodule Sue.Models.Message do
   defp add_account_and_chat_to_graph(%Message{account: a, chat: c} = msg) do
     {:ok, _dbid} = DB.add_user_chat_edge(a, c)
     msg
+  end
+
+  defp build_telegram_message(command, args, body, msg) do
+    paccount =
+      %PlatformAccount{platform_id: {:telegram, msg.from.id}}
+      |> PlatformAccount.resolve()
+
+    chat =
+      %Chat{
+        platform_id: {:telegram, msg.chat.id},
+        is_direct: msg.chat.type == "private"
+      }
+      |> Chat.resolve()
+
+    account = Account.from_paccount(paccount)
+
+    %Message{
+      platform: :telegram,
+      id: "#{msg.chat.id}.#{msg.message_id}",
+      #
+      paccount: paccount,
+      chat: chat,
+      account: account,
+      #
+      body: body,
+      time: DateTime.from_unix!(msg.date),
+      #
+      is_from_sue: false,
+      is_ignorable: command == "" or account.is_ignored or chat.is_ignored,
+
+      # either in the message sent, or the message referenced in a reply
+      has_attachments:
+        Map.get(msg, :photo) != nil or
+          Map.get(msg, :document) != nil or
+          Map.get(msg, :reply_to_message, %{})[:photo] != nil or
+          Map.get(msg, :reply_to_message, %{})[:document] != nil,
+      command: command,
+      args: args
+    }
+    |> construct_attachments(msg)
+    |> add_account_and_chat_to_graph()
+  end
+
+  defp telegram_text(msg) do
+    better_trim(msg.text || msg.caption || "")
   end
 
   # Command prefix per platform. Telegram uses "/" because that's what its
