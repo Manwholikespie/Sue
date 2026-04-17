@@ -6,10 +6,17 @@ defmodule Sue.Mailbox.Telegram do
 
   alias Sue.Models.{Attachment, Message, Response}
 
+  # Telegram's message limit is 4096 UTF-16 code units. Counting graphemes is
+  # conservative: grapheme count <= code unit count, so we'll never exceed
+  # Telegram's limit, though we may split slightly earlier on grapheme-heavy text.
   @telegram_max_length 4096
   @bot_name :sue_bot
-  @tmp_path System.tmp_dir!()
   @default_mime "application/octet-stream"
+
+  # HTTP timeouts for file downloads. Telegram CDN files can be large; the
+  # connect timeout is tighter than recv so a dead endpoint fails fast.
+  @http_connect_timeout 10_000
+  @http_recv_timeout 30_000
 
   @spec send_response(Message.t(), Response.t()) :: :ok | {:error, term()}
   def send_response(_msg, %Response{body: nil, attachments: []}), do: :ok
@@ -133,7 +140,7 @@ defmodule Sue.Mailbox.Telegram do
            get_file(file_id),
          url <- ExGram.File.file_url(file, bot: @bot_name),
          filename <- Sue.Utils.unique_string(),
-         filepath <- Path.join(@tmp_path, filename <> Path.extname(file_path)),
+         filepath <- Path.join(System.tmp_dir!(), filename <> Path.extname(file_path)),
          {:ok, body, headers} <- http_get(url),
          :ok <- File.write(filepath, body) do
       mime_type = original_mime_type || extract_mime_from_headers(headers) || @default_mime
@@ -143,130 +150,71 @@ defmodule Sue.Mailbox.Telegram do
     end
   end
 
-  # Split a message into chunks that fit within Telegram's character limit
-  # Tries to split at paragraph boundaries, then word boundaries, then character boundaries
+  # Split a message into chunks that fit within Telegram's character limit.
+  # Prefers paragraph boundaries, then whitespace, then a hard split with a
+  # trailing hyphen. Operates on graphemes (not bytes) so multi-byte UTF-8
+  # characters are never split in half.
   @doc false
   @spec split_message(String.t()) :: [String.t()]
-  def split_message(text) when byte_size(text) <= @telegram_max_length do
-    [text]
+  def split_message(text) when is_binary(text) do
+    if String.length(text) <= @telegram_max_length do
+      [text]
+    else
+      split_chunks(text, [])
+    end
   end
 
-  def split_message(text) do
-    split_message_recursive(text, [])
-  end
+  defp split_chunks("", acc), do: Enum.reverse(acc)
 
-  defp split_message_recursive("", acc), do: Enum.reverse(acc)
-
-  defp split_message_recursive(text, acc) do
-    if byte_size(text) <= @telegram_max_length do
+  defp split_chunks(text, acc) do
+    if String.length(text) <= @telegram_max_length do
       Enum.reverse([text | acc])
     else
-      {chunk, rest} = extract_chunk(text)
-      split_message_recursive(rest, [chunk | acc])
+      {chunk, rest} = take_chunk(text)
+      split_chunks(rest, [chunk | acc])
     end
   end
 
-  # Extract a chunk that fits within the limit
-  defp extract_chunk(text) do
-    # Try to split at paragraph boundary (double newline)
-    case find_split_point(text, "\n\n") do
-      {:ok, chunk, rest} ->
-        {chunk, rest}
-
-      :too_large ->
-        # Try to split at any newline or space (word boundary)
-        case find_split_point(text, ~r/[\s\n]/) do
-          {:ok, chunk, rest} ->
-            {chunk, rest}
-
-          :too_large ->
-            # Last resort: split at character boundary with hyphen
-            # Take max_length - 1 to leave room for hyphen
-            split_at = @telegram_max_length - 1
-            <<chunk::binary-size(^split_at), rest::binary>> = text
-            {chunk <> "-", rest}
-        end
-    end
-  end
-
-  # Find a split point using a delimiter, ensuring the chunk fits within the limit
-  defp find_split_point(text, delimiter) when is_binary(delimiter) do
-    find_split_point_binary(text, delimiter, 0, 0)
-  end
-
-  defp find_split_point(text, %Regex{} = regex) do
-    find_split_point_regex(text, regex)
-  end
-
-  defp find_split_point_binary(text, delimiter, last_delim_pos, current_pos) do
-    remaining = byte_size(text) - current_pos
+  # Peel off a chunk of at most @telegram_max_length graphemes. String.split_at/2
+  # respects grapheme boundaries, so `window` is always valid UTF-8. Inside the
+  # window we can safely use :binary.matches/2 with ASCII delimiters because
+  # ASCII bytes never appear as UTF-8 continuation bytes.
+  defp take_chunk(text) do
+    {window, tail} = String.split_at(text, @telegram_max_length)
 
     cond do
-      remaining == 0 and last_delim_pos > 0 ->
-        # Reached end of text, use last delimiter position
-        delim_size = byte_size(delimiter)
+      match = last_ascii_match(window, "\n\n") ->
+        split_window(window, match, tail)
 
-        <<chunk::binary-size(^last_delim_pos), _delim::binary-size(^delim_size), rest::binary>> =
-          text
-
-        {:ok, chunk, rest}
-
-      remaining == 0 ->
-        # No delimiter found in the entire searchable range
-        :too_large
-
-      current_pos >= @telegram_max_length ->
-        # Exceeded limit, use last known delimiter position
-        if last_delim_pos > 0 do
-          delim_size = byte_size(delimiter)
-
-          <<chunk::binary-size(^last_delim_pos), _delim::binary-size(^delim_size), rest::binary>> =
-            text
-
-          {:ok, chunk, rest}
-        else
-          :too_large
-        end
+      match = last_ascii_match(window, [" ", "\t", "\n", "\r"]) ->
+        split_window(window, match, tail)
 
       true ->
-        # Check if we have a delimiter at current position
-        delim_size = byte_size(delimiter)
-
-        case text do
-          <<_::binary-size(^current_pos), ^delimiter::binary-size(^delim_size), _::binary>> ->
-            # Found delimiter, update last known position and continue
-            find_split_point_binary(text, delimiter, current_pos, current_pos + delim_size)
-
-          _ ->
-            # No delimiter here, move to next character
-            find_split_point_binary(text, delimiter, last_delim_pos, current_pos + 1)
-        end
+        # Fallback: take max_length - 1 graphemes and append a hyphen so the
+        # total chunk length is exactly @telegram_max_length characters.
+        {chunk, rest} = String.split_at(window, @telegram_max_length - 1)
+        {chunk <> "-", rest <> tail}
     end
   end
 
-  defp find_split_point_regex(text, regex) do
-    # Find all matches within the limit
-    searchable = binary_part(text, 0, min(byte_size(text), @telegram_max_length))
-    matches = Regex.scan(regex, searchable, return: :index)
+  defp split_window(window, {pos, len}, tail) do
+    <<chunk::binary-size(^pos), _delim::binary-size(^len), rest::binary>> = window
+    {chunk, rest <> tail}
+  end
 
-    case List.last(matches) do
-      nil ->
-        :too_large
-
-      [{pos, len}] ->
-        # Split at the last whitespace found
-        <<chunk::binary-size(^pos), _ws::binary-size(^len), rest::binary>> = text
-        {:ok, chunk, rest}
-
-      _ ->
-        :too_large
+  defp last_ascii_match(text, pattern) do
+    case :binary.matches(text, pattern) do
+      [] -> nil
+      matches -> List.last(matches)
     end
   end
 
   defp chat_id(%Message{chat: %{platform_id: {_platform, id}}}), do: id
 
   defp http_get(url) do
-    case HTTPoison.get(url) do
+    opts = [timeout: @http_connect_timeout, recv_timeout: @http_recv_timeout]
+
+    case HTTPoison.get(url, [], opts) do
       {:ok, %HTTPoison.Response{status_code: status, body: body, headers: headers}}
       when status in 200..299 ->
         {:ok, body, headers}

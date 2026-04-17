@@ -19,7 +19,10 @@ defmodule Sue.Mailbox.Telegram.BotTest do
 
     {_bot_name, _module_name} = ExGram.Test.start_bot(context, Bot)
 
-    assert_receive {:commands_registered, body}
+    # Command registration runs asynchronously (unlinked Task) so the bot's
+    # init isn't blocked on a network round-trip. Give it more than the
+    # default 100ms to land.
+    assert_receive {:commands_registered, body}, 1_000
 
     commands = body[:commands]
 

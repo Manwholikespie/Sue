@@ -22,7 +22,7 @@ defmodule Sue.Mailbox.TelegramTest do
 
       chunks = Telegram.split_message(text)
       assert length(chunks) == 2
-      assert Enum.all?(chunks, fn chunk -> byte_size(chunk) <= 4096 end)
+      assert Enum.all?(chunks, fn chunk -> String.length(chunk) <= 4096 end)
       # Verify original text can be reconstructed (minus the space)
       assert Enum.join(chunks, " ") == text
     end
@@ -35,7 +35,7 @@ defmodule Sue.Mailbox.TelegramTest do
 
       chunks = Telegram.split_message(text)
       assert length(chunks) == 2
-      assert Enum.all?(chunks, fn chunk -> byte_size(chunk) <= 4096 end)
+      assert Enum.all?(chunks, fn chunk -> String.length(chunk) <= 4096 end)
       # First chunk should end at paragraph boundary
       assert hd(chunks) == para1
     end
@@ -49,12 +49,12 @@ defmodule Sue.Mailbox.TelegramTest do
 
       # First chunk should be 4095 chars + hyphen = 4096
       first_chunk = hd(chunks)
-      assert byte_size(first_chunk) == 4096
+      assert String.length(first_chunk) == 4096
       assert String.ends_with?(first_chunk, "-")
 
       # Second chunk should be the rest (5000 - 4095 = 905)
       second_chunk = List.last(chunks)
-      assert byte_size(second_chunk) == 905
+      assert String.length(second_chunk) == 905
     end
 
     test "splits multiple times for very long messages" do
@@ -64,7 +64,7 @@ defmodule Sue.Mailbox.TelegramTest do
 
       chunks = Telegram.split_message(text)
       assert length(chunks) >= 3
-      assert Enum.all?(chunks, fn chunk -> byte_size(chunk) <= 4096 end)
+      assert Enum.all?(chunks, fn chunk -> String.length(chunk) <= 4096 end)
 
       # Verify we can roughly reconstruct the message
       reconstructed = Enum.join(chunks, " ")
@@ -79,7 +79,7 @@ defmodule Sue.Mailbox.TelegramTest do
 
       chunks = Telegram.split_message(text)
       assert length(chunks) >= 2
-      assert Enum.all?(chunks, fn chunk -> byte_size(chunk) <= 4096 end)
+      assert Enum.all?(chunks, fn chunk -> String.length(chunk) <= 4096 end)
     end
 
     test "handles mixed paragraph and word boundaries" do
@@ -92,7 +92,7 @@ defmodule Sue.Mailbox.TelegramTest do
 
       chunks = Telegram.split_message(text)
       assert length(chunks) >= 2
-      assert Enum.all?(chunks, fn chunk -> byte_size(chunk) <= 4096 end)
+      assert Enum.all?(chunks, fn chunk -> String.length(chunk) <= 4096 end)
     end
 
     test "handles empty string" do
@@ -107,7 +107,7 @@ defmodule Sue.Mailbox.TelegramTest do
 
       chunks = Telegram.split_message(emoji_text)
       assert length(chunks) >= 2
-      assert Enum.all?(chunks, fn chunk -> byte_size(chunk) <= 4096 end)
+      assert Enum.all?(chunks, fn chunk -> String.length(chunk) <= 4096 end)
     end
 
     test "edge case: message with only one word slightly over limit" do
@@ -118,11 +118,11 @@ defmodule Sue.Mailbox.TelegramTest do
       assert length(chunks) == 2
 
       # First chunk: 4095 + hyphen
-      assert byte_size(hd(chunks)) == 4096
+      assert String.length(hd(chunks)) == 4096
       assert String.ends_with?(hd(chunks), "-")
 
       # Second chunk: remaining 5 chars
-      assert byte_size(List.last(chunks)) == 5
+      assert String.length(List.last(chunks)) == 5
     end
 
     test "preserves spacing when splitting at word boundaries" do
@@ -133,7 +133,7 @@ defmodule Sue.Mailbox.TelegramTest do
       chunks = Telegram.split_message(text)
 
       # All chunks should be under limit
-      assert Enum.all?(chunks, fn chunk -> byte_size(chunk) <= 4096 end)
+      assert Enum.all?(chunks, fn chunk -> String.length(chunk) <= 4096 end)
 
       # Verify no chunk starts or ends with space (splits consume the delimiter)
       Enum.each(chunks, fn chunk ->

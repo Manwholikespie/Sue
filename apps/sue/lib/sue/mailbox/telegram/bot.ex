@@ -65,20 +65,30 @@ defmodule Sue.Mailbox.Telegram.Bot.CommandRegistrar do
   @impl ExGram.BotInit
   def on_bot_init(opts) do
     bot = Keyword.fetch!(opts, :bot)
+
+    # set_my_commands is a synchronous HTTP call to Telegram. Running it
+    # inline would block the bot's init and, transitively, the supervisor
+    # tree's startup on a network round trip. Kick it to an unlinked task so
+    # startup proceeds immediately; the registration logs its own outcome.
+    Task.start(fn -> register_commands(bot) end)
+    :ok
+  end
+
+  defp register_commands(bot) do
     commands = build_commands()
 
     case ExGram.set_my_commands(commands, bot: bot) do
       {:ok, true} ->
         Logger.info("[Telegram] registered #{length(commands)} commands")
-        :ok
 
       {:error, error} ->
         Logger.warning(
           "[Telegram] set_my_commands failed: #{inspect(error)}; continuing without autocomplete"
         )
-
-        :ok
     end
+  rescue
+    error ->
+      Logger.warning("[Telegram] command registration crashed: #{inspect(error)}")
   end
 
   defp build_commands do
