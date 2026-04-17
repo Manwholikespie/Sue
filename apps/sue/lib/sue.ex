@@ -136,7 +136,7 @@ defmodule Sue do
     :ok
   end
 
-  @spec execute_command(map(), Message.t()) :: Response.t()
+  @spec execute_command(map(), Message.t()) :: Response.t() | Attachment.t() | [Attachment.t()]
   defp execute_command(_, %Message{account: %Account{is_banned: true, ban_reason: ban_reason}}) do
     %Response{
       body: "User is banned for reason: '#{ban_reason}'. May God have mercy on your soul."
