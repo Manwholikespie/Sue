@@ -53,8 +53,7 @@ defmodule Sue.MixProject do
       {:phoenix_pubsub, "~> 2.0"},
       # telegram - start
       {:ex_gram, "~> 0.65"},
-      {:httpoison, "~> 2.2"},
-      {:tesla, "~> 1.16"},
+      {:req, "~> 0.5"},
       # telegram - end
       {:jason, "~> 1.2"},
       {:hammer, "~> 6.1"},

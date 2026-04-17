@@ -86,10 +86,8 @@ config :sue,
   sd_rate_limit: {:timer.hours(24), 17}
 
 config :ex_gram,
-  adapter: ExGram.Adapter.Tesla,
+  adapter: ExGram.Adapter.Req,
   json_engine: Jason
-
-config :tesla, adapter: Tesla.Adapter.Gun
 
 config :subaru,
   dbname: "subaru_#{config_env()}"

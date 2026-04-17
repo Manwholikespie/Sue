@@ -80,8 +80,7 @@ import Config
 
 # Telegram API
 config :sue, telegram_token: "mytoken"
-config :ex_gram, adapter: ExGram.Adapter.Tesla, json_engine: Jason
-config :tesla, adapter: Tesla.Adapter.Gun
+config :ex_gram, adapter: ExGram.Adapter.Req, json_engine: Jason
 
 # Discord API
 config :nostrum,

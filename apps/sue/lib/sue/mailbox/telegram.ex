@@ -212,14 +212,18 @@ defmodule Sue.Mailbox.Telegram do
   defp chat_id(%Message{chat: %{platform_id: {_platform, id}}}), do: id
 
   defp http_get(url) do
-    opts = [timeout: @http_connect_timeout, recv_timeout: @http_recv_timeout]
+    opts = [
+      connect_options: [timeout: @http_connect_timeout],
+      receive_timeout: @http_recv_timeout,
+      decode_body: false
+    ]
 
-    case HTTPoison.get(url, [], opts) do
-      {:ok, %HTTPoison.Response{status_code: status, body: body, headers: headers}}
+    case Req.get(url, opts) do
+      {:ok, %Req.Response{status: status, body: body, headers: headers}}
       when status in 200..299 ->
         {:ok, body, headers}
 
-      {:ok, %HTTPoison.Response{status_code: status}} ->
+      {:ok, %Req.Response{status: status}} ->
         {:error, {:http_status, status}}
 
       {:error, error} ->
@@ -227,28 +231,13 @@ defmodule Sue.Mailbox.Telegram do
     end
   end
 
-  defp extract_mime_from_headers(headers) do
-    Enum.find_value(headers, fn
-      {name, [value | _rest]} ->
-        header_mime(name, value)
-
-      {name, value} ->
-        header_mime(name, value)
-
-      _ ->
-        nil
-    end)
-  end
-
-  defp header_mime(name, value) when is_binary(name) and is_binary(value) do
-    if String.downcase(name) == "content-type" do
-      value
-      |> String.split(";")
-      |> List.first()
+  # Req returns headers as %{"name" => ["value", ...]} with lowercased names.
+  defp extract_mime_from_headers(headers) when is_map(headers) do
+    case Map.get(headers, "content-type") do
+      [value | _] when is_binary(value) -> value |> String.split(";") |> List.first()
+      _ -> nil
     end
   end
-
-  defp header_mime(_name, _value), do: nil
 
   defp log_transport_error(action, error) do
     Logger.error("[Telegram] #{action} failed: #{inspect(error)}")

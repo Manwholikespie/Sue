@@ -152,15 +152,15 @@ defmodule Sue.Models.Attachment do
     filename = Sue.Utils.unique_string()
     filepath = Path.join(@tmp_path, filename <> Path.extname(url))
 
-    case HTTPoison.get(url) do
-      {:ok, %HTTPoison.Response{status_code: status, body: body, headers: headers}}
+    case Req.get(url, decode_body: false) do
+      {:ok, %Req.Response{status: status, body: body, headers: headers}}
       when status in 200..299 ->
         File.write!(filepath, body)
         fsize = byte_size(body)
         mime_type = extract_mime_from_headers(headers) || @default_mime
         {:ok, filepath, fsize, mime_type}
 
-      {:ok, %HTTPoison.Response{status_code: status}} ->
+      {:ok, %Req.Response{status: status}} ->
         {:error, {:http_status, status}}
 
       {:error, error} ->
@@ -168,24 +168,11 @@ defmodule Sue.Models.Attachment do
     end
   end
 
-  defp extract_mime_from_headers(headers) do
-    Enum.find_value(headers, fn
-      {name, [value | _rest]} when is_binary(name) and is_binary(value) ->
-        extract_header_mime(name, value)
-
-      {name, value} when is_binary(name) and is_binary(value) ->
-        extract_header_mime(name, value)
-
-      _ ->
-        nil
-    end)
-  end
-
-  defp extract_header_mime(name, value) do
-    if String.downcase(name) == "content-type" do
-      value
-      |> String.split(";")
-      |> List.first()
+  # Req returns headers as %{"name" => ["value", ...]} with lowercased names.
+  defp extract_mime_from_headers(headers) when is_map(headers) do
+    case Map.get(headers, "content-type") do
+      [value | _] when is_binary(value) -> value |> String.split(";") |> List.first()
+      _ -> nil
     end
   end
 
