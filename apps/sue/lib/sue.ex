@@ -161,7 +161,7 @@ defmodule Sue do
   end
 
   # Message from Sue
-  @spec log_and_cache_recent(Message.t(), Response.t() | nil) :: :ok
+  @spec log_and_cache_recent(Message.t(), Response.t() | Attachment.t() | nil) :: :ok
   defp log_and_cache_recent(%Message{is_from_sue: true}, nil), do: :ok
 
   # Message/command from user
@@ -170,6 +170,17 @@ defmodule Sue do
       name: Account.friendly_name(msg.account),
       body: msg.body,
       is_from_sue: false,
+      is_from_gpt: false
+    })
+  end
+
+  # Sue response, attachment.
+  # TODO: Log enough info to be able to use the file.
+  defp log_and_cache_recent(msg, %Attachment{}) do
+    Sue.DB.RecentMessages.add(msg.chat.id, %{
+      name: "sue",
+      body: "<media>",
+      is_from_sue: true,
       is_from_gpt: false
     })
   end
