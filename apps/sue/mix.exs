@@ -53,7 +53,7 @@ defmodule Sue.MixProject do
       {:phoenix_pubsub, "~> 2.0"},
       # telegram - start
       {:ex_gram, "~> 0.65"},
-      {:req, "~> 0.5"},
+      {:req, "~> 0.5.17"},
       # telegram - end
       {:jason, "~> 1.2"},
       {:hammer, "~> 6.1"},
@@ -63,7 +63,6 @@ defmodule Sue.MixProject do
       {:nostrum, "~> 0.10"},
       {:cowlib, "~> 2.15"},
       {:gun, "~> 2.2"},
-      {:mime, "~> 1.2"},
       # images
       {:image, "~> 0.37"}
     ]
