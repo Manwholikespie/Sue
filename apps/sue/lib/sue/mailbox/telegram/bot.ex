@@ -11,10 +11,14 @@ defmodule Sue.Mailbox.Telegram.Bot do
 
   on_bot_init(Sue.Mailbox.Telegram.Bot.CommandRegistrar)
 
+  # ex_gram strips the "/cmd" prefix from msg.text (or msg.caption) before
+  # dispatching {:command, cmd, msg}. Rebuild the original text so Sue's
+  # platform-agnostic command parser sees the slash and extracts the command.
   def handle({:command, cmd, %{from: %{id: _}, chat: %{id: _}, date: date} = msg}, context)
       when is_integer(date) do
-    Sue.process_messages([Message.from_telegram_command(cmd, msg)])
-    context
+    rest = msg.text || msg.caption || ""
+    restored = if rest == "", do: "/#{cmd}", else: "/#{cmd} #{rest}"
+    ingest(%{msg | text: restored}, context)
   end
 
   def handle({:command, _cmd, _msg}, context), do: context
@@ -32,7 +36,6 @@ defmodule Sue.Mailbox.Telegram.Bot do
   def handle({:message, _msg}, context), do: context
 
   def handle({:edited_message, _msg}, context), do: context
-  def handle({:update, _update}, context), do: context
   def handle(_other, context), do: context
 
   defp ingest(
@@ -45,7 +48,7 @@ defmodule Sue.Mailbox.Telegram.Bot do
          context
        )
        when is_binary(chat_type) and is_integer(message_id) and is_integer(date) do
-    Sue.process_messages([Message.from_telegram2(msg)])
+    Sue.process_messages([Message.from_telegram(msg)])
     context
   end
 end
