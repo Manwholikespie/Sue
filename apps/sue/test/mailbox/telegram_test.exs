@@ -120,6 +120,17 @@ defmodule Sue.Mailbox.TelegramTest do
       assert all_within_limit?(chunks)
     end
 
+    test "pathological: single grapheme larger than the limit is split" do
+      # A base character plus thousands of combining marks is one grapheme
+      # cluster. At 5000+ code units it's bigger than Telegram accepts; the
+      # splitter must break inside the grapheme rather than emit it whole.
+      text = "a" <> String.duplicate("\u0301", 5000)
+
+      chunks = Telegram.split_message(text)
+      assert length(chunks) >= 2
+      assert all_within_limit?(chunks)
+    end
+
     test "edge case: message with only one word slightly over limit" do
       text = String.duplicate("B", 4100)
 

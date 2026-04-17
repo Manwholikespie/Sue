@@ -210,9 +210,12 @@ defmodule Sue.Mailbox.Telegram do
   end
 
   # Returns {prefix, rest} where prefix contains as many whole graphemes from
-  # `text` as fit within `max_u16` UTF-16 code units. An oversized single
-  # grapheme (>max_u16 code units on its own) is surfaced as a one-grapheme
-  # prefix rather than looping forever.
+  # `text` as fit within `max_u16` UTF-16 code units. If a single grapheme
+  # exceeds the limit on its own (e.g. "a" followed by thousands of combining
+  # marks), fall back to codepoint-level splitting within that grapheme so
+  # we never emit a chunk Telegram will reject. The visible glyph may render
+  # partially at the break, which is the least-bad option for pathological
+  # input.
   defp take_utf16_prefix(text, max_u16) do
     take_utf16_prefix(text, max_u16, 0, [])
   end
@@ -230,7 +233,38 @@ defmodule Sue.Mailbox.Telegram do
             take_utf16_prefix(tail, max_u16, acc_u16 + g_u16, [g | acc])
 
           acc == [] ->
-            {g, tail}
+            {cp_prefix, cp_rest} = take_utf16_codepoints(g, max_u16)
+            {cp_prefix, cp_rest <> tail}
+
+          true ->
+            {IO.iodata_to_binary(Enum.reverse(acc)), rest}
+        end
+    end
+  end
+
+  # Fallback used only when one grapheme is larger than max_u16 on its own.
+  # Walks codepoints instead of graphemes so we always make progress.
+  defp take_utf16_codepoints(text, max_u16) do
+    take_utf16_codepoints(text, max_u16, 0, [])
+  end
+
+  defp take_utf16_codepoints(rest, max_u16, acc_u16, acc) do
+    case String.next_codepoint(rest) do
+      nil ->
+        {IO.iodata_to_binary(Enum.reverse(acc)), ""}
+
+      {cp, tail} ->
+        cp_u16 = utf16_length(cp)
+
+        cond do
+          acc_u16 + cp_u16 <= max_u16 ->
+            take_utf16_codepoints(tail, max_u16, acc_u16 + cp_u16, [cp | acc])
+
+          acc == [] ->
+            # Only reachable if max_u16 < cp_u16, i.e. max_u16 == 1 and cp is
+            # a supplementary-plane character. Our call sites pass max_u16 of
+            # 4095 or 4096, so this branch is defensive, not exercised.
+            {cp, tail}
 
           true ->
             {IO.iodata_to_binary(Enum.reverse(acc)), rest}
