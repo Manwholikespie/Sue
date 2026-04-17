@@ -88,7 +88,7 @@ defmodule Sue.Commands.Poll do
     else
       # Use Telegram's custom interface.
       {_, chatid} = chat.platform_id
-      {:ok, _} = Telegex.send_poll(chatid, poll.topic, poll.options, is_anonymous: false)
+      {:ok, _} = Sue.Mailbox.Telegram.send_poll(chatid, poll.topic, poll.options)
       %Response{}
     end
   end

@@ -10,6 +10,12 @@ config :desu_web, DesuWeb.Endpoint,
 # Print only warnings and errors during test
 config :logger, level: :debug
 
+config :ex_gram,
+  token: "test_token",
+  adapter: ExGram.Adapter.Test,
+  updates: ExGram.Updates.Test,
+  json_engine: Jason
+
 config :sue,
   cmd_rate_limit: {:timer.seconds(5), 5000},
   query_debug: false,

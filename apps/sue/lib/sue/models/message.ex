@@ -131,12 +131,11 @@ defmodule Sue.Models.Message do
 
   defp parse_imessage_time(_), do: DateTime.utc_now()
 
-  def from_telegram2(msg) do
+  def from_telegram(msg) do
     {command, args, body} =
-      command_args_from_body(:telegram, msg.text || msg.caption || "")
+      command_args_from_body(:telegram, telegram_text(msg))
 
-    command =
-      parse_command_potentially_with_botname_suffix(command)
+    command = parse_command_potentially_with_botname_suffix(command)
 
     paccount =
       %PlatformAccount{platform_id: {:telegram, msg.from.id}}
@@ -303,6 +302,10 @@ defmodule Sue.Models.Message do
   defp add_account_and_chat_to_graph(%Message{account: a, chat: c} = msg) do
     {:ok, _dbid} = DB.add_user_chat_edge(a, c)
     msg
+  end
+
+  defp telegram_text(msg) do
+    better_trim(msg.text || msg.caption || "")
   end
 
   # Command prefix per platform. Telegram uses "/" because that's what its

@@ -1,5 +1,6 @@
 notes/
 mnesia/
+inspiration/
 db_data/
 .DS_Store
 .env

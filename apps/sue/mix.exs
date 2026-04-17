@@ -9,7 +9,7 @@ defmodule Sue.MixProject do
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
-      elixir: "~> 1.7",
+      elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -23,7 +23,7 @@ defmodule Sue.MixProject do
   def application do
     [
       mod: {Sue.Application, []},
-      extra_applications: [:logger, :runtime_tools, :finch, :multipart, :eex],
+      extra_applications: [:logger, :runtime_tools, :eex],
       included_applications: included_applications()
     ]
   end
@@ -52,9 +52,8 @@ defmodule Sue.MixProject do
       {:logger_file_backend, "~> 0.0.10"},
       {:phoenix_pubsub, "~> 2.0"},
       # telegram - start
-      {:telegex, "~> 1.9.0-rc.0"},
-      {:finch, "~> 0.19"},
-      {:multipart, "~> 0.1.0"},
+      {:ex_gram, "~> 0.65"},
+      {:req, "~> 0.5.17"},
       # telegram - end
       {:jason, "~> 1.2"},
       {:hammer, "~> 6.1"},
@@ -64,7 +63,6 @@ defmodule Sue.MixProject do
       {:nostrum, "~> 0.10"},
       {:cowlib, "~> 2.15"},
       {:gun, "~> 2.2"},
-      {:mime, "~> 1.2"},
       # images
       {:image, "~> 0.37"}
     ]

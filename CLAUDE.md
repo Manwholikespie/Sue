@@ -17,10 +17,10 @@ Sue is an Elixir-based multi-platform chatbot that supports iMessage, Discord, a
 ### Key Components
 
 #### Platform Integration (`apps/sue/lib/sue/mailbox/`)
-Each platform has its own GenServer handling incoming/outgoing messages.
+Each platform has its own mailbox integration handling incoming/outgoing messages.
 
 - **IMessage**: Uses `imessaged` library for macOS Messages.app integration
-- **Telegram**: Uses `telegex` client library
+- **Telegram**: Uses `ex_gram` client library
 - **Discord**: Uses `nostrum` client library
 
 #### Command System (`apps/sue/lib/sue/commands/`)
@@ -94,7 +94,7 @@ mix dialyzer
 
 3. **Platform-specific**:
    - iMessage: Requires macOS with Messages.app
-   - Telegram: Set commands with `Sue.post_init()` in iex
+   - Telegram: Commands register automatically on bot startup
    - Discord: Needs message content intent enabled
 
 ## Adding New Commands

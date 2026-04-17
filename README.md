@@ -79,7 +79,8 @@ If you don't want to connect via the root Arango account, make sure the user you
 import Config
 
 # Telegram API
-config :telegex, token: "mytoken"
+config :sue, telegram_token: "mytoken"
+config :ex_gram, adapter: ExGram.Adapter.Req, json_engine: Jason
 
 # Discord API
 config :nostrum,
@@ -130,7 +131,7 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
 12. To create a prod build, run `MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
 
-13. To run in interactive dev mode, you can run `iex -S mix`.  If you want to Telegram to autocomplete your commands, run `Sue.post_init()` from within this interactive prompt. Sorry this part is a little scuffed.
+13. To run in interactive dev mode, you can run `iex -S mix`. Telegram command autocomplete is now registered automatically when the bot starts.
 
 ## How do I add a command?
 
