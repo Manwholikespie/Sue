@@ -6,10 +6,11 @@ defmodule Sue.Mailbox.Telegram do
 
   alias Sue.Models.{Attachment, Message, Response}
 
-  # Telegram's message limit is 4096 UTF-16 code units. Counting graphemes is
-  # conservative: grapheme count <= code unit count, so we'll never exceed
-  # Telegram's limit, though we may split slightly earlier on grapheme-heavy text.
-  @telegram_max_length 4096
+  # Telegram's message limit is 4096 UTF-16 code units. Not graphemes, not
+  # codepoints, not UTF-8 bytes. A single flag emoji like 🇺🇸 is one grapheme
+  # but four UTF-16 code units (two surrogate pairs), so a grapheme-based
+  # limit can overshoot by up to 4×.
+  @telegram_max_u16 4096
   @bot_name :sue_bot
   @default_mime "application/octet-stream"
 
@@ -150,14 +151,14 @@ defmodule Sue.Mailbox.Telegram do
     end
   end
 
-  # Split a message into chunks that fit within Telegram's character limit.
-  # Prefers paragraph boundaries, then whitespace, then a hard split with a
-  # trailing hyphen. Operates on graphemes (not bytes) so multi-byte UTF-8
-  # characters are never split in half.
+  # Split a message into chunks that fit within Telegram's UTF-16 code unit
+  # limit. Prefers paragraph boundaries, then whitespace, then a hard split
+  # with a trailing hyphen. Walks graphemes so we never break a glyph in
+  # half, while counting UTF-16 code units so we never overshoot the limit.
   @doc false
   @spec split_message(String.t()) :: [String.t()]
   def split_message(text) when is_binary(text) do
-    if String.length(text) <= @telegram_max_length do
+    if utf16_length(text) <= @telegram_max_u16 do
       [text]
     else
       split_chunks(text, [])
@@ -167,7 +168,7 @@ defmodule Sue.Mailbox.Telegram do
   defp split_chunks("", acc), do: Enum.reverse(acc)
 
   defp split_chunks(text, acc) do
-    if String.length(text) <= @telegram_max_length do
+    if utf16_length(text) <= @telegram_max_u16 do
       Enum.reverse([text | acc])
     else
       {chunk, rest} = take_chunk(text)
@@ -175,12 +176,12 @@ defmodule Sue.Mailbox.Telegram do
     end
   end
 
-  # Peel off a chunk of at most @telegram_max_length graphemes. String.split_at/2
-  # respects grapheme boundaries, so `window` is always valid UTF-8. Inside the
-  # window we can safely use :binary.matches/2 with ASCII delimiters because
-  # ASCII bytes never appear as UTF-8 continuation bytes.
+  # Peel off a chunk of at most @telegram_max_u16 UTF-16 code units. The
+  # window is always valid UTF-8 because take_utf16_prefix/2 walks grapheme
+  # boundaries. Inside the window we can use :binary.matches/2 with ASCII
+  # delimiters because ASCII bytes never appear as UTF-8 continuation bytes.
   defp take_chunk(text) do
-    {window, tail} = String.split_at(text, @telegram_max_length)
+    {window, tail} = take_utf16_prefix(text, @telegram_max_u16)
 
     cond do
       match = last_ascii_match(window, "\n\n") ->
@@ -190,9 +191,8 @@ defmodule Sue.Mailbox.Telegram do
         split_window(window, match, tail)
 
       true ->
-        # Fallback: take max_length - 1 graphemes and append a hyphen so the
-        # total chunk length is exactly @telegram_max_length characters.
-        {chunk, rest} = String.split_at(window, @telegram_max_length - 1)
+        # Fallback: reserve one UTF-16 code unit for the trailing "-".
+        {chunk, rest} = take_utf16_prefix(window, @telegram_max_u16 - 1)
         {chunk <> "-", rest <> tail}
     end
   end
@@ -207,6 +207,44 @@ defmodule Sue.Mailbox.Telegram do
       [] -> nil
       matches -> List.last(matches)
     end
+  end
+
+  # Returns {prefix, rest} where prefix contains as many whole graphemes from
+  # `text` as fit within `max_u16` UTF-16 code units. An oversized single
+  # grapheme (>max_u16 code units on its own) is surfaced as a one-grapheme
+  # prefix rather than looping forever.
+  defp take_utf16_prefix(text, max_u16) do
+    take_utf16_prefix(text, max_u16, 0, [])
+  end
+
+  defp take_utf16_prefix(rest, max_u16, acc_u16, acc) do
+    case String.next_grapheme(rest) do
+      nil ->
+        {IO.iodata_to_binary(Enum.reverse(acc)), ""}
+
+      {g, tail} ->
+        g_u16 = utf16_length(g)
+
+        cond do
+          acc_u16 + g_u16 <= max_u16 ->
+            take_utf16_prefix(tail, max_u16, acc_u16 + g_u16, [g | acc])
+
+          acc == [] ->
+            {g, tail}
+
+          true ->
+            {IO.iodata_to_binary(Enum.reverse(acc)), rest}
+        end
+    end
+  end
+
+  # Count UTF-16 code units in a UTF-8 binary. Each BMP codepoint contributes
+  # one code unit; supplementary-plane codepoints (>= U+10000) contribute two.
+  defp utf16_length(text) do
+    text
+    |> :unicode.characters_to_binary(:utf8, {:utf16, :big})
+    |> byte_size()
+    |> div(2)
   end
 
   defp chat_id(%Message{chat: %{platform_id: {_platform, id}}}), do: id
