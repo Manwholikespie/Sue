@@ -107,7 +107,7 @@ defmodule Sue.Commands.Core do
           "No documentation for that yet. Let us know! https://github.com/Manwholikespie/Sue"
 
         {_, _, doc} ->
-          doc
+          String.trim(doc)
       end
 
     %Response{body: body}
