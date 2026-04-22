@@ -15,8 +15,6 @@ defmodule Sue.DB.RecentMessages do
 
   alias :queue, as: Queue
 
-  import Subaru, only: [is_dbid: 1]
-
   @type queue() :: Queue.queue()
 
   # Keep 6 prev messages per chat
@@ -61,13 +59,13 @@ defmodule Sue.DB.RecentMessages do
 
   # === Public API ===
 
-  @spec add(Subaru.dbid(), map()) :: :ok
-  def add(chat_id, message) when is_dbid(chat_id) do
+  @spec add(bitstring(), map()) :: :ok
+  def add(chat_id, message) when is_binary(chat_id) do
     GenServer.call(__MODULE__, {:add, chat_id, message})
   end
 
-  @spec get(Subaru.dbid()) :: [map()]
-  def get(chat_id) when is_dbid(chat_id) do
+  @spec get(bitstring()) :: [map()]
+  def get(chat_id) when is_binary(chat_id) do
     GenServer.call(__MODULE__, {:get, chat_id})
   end
 
@@ -75,8 +73,8 @@ defmodule Sue.DB.RecentMessages do
   Get recent messages, ignoring the most recent. Useful when a command was just
   executed (and thus logged) and we only care about the msgs just before then.
   """
-  @spec get_tail(Subaru.dbid()) :: [map()]
-  def get_tail(chat_id) when is_dbid(chat_id) do
+  @spec get_tail(bitstring()) :: [map()]
+  def get_tail(chat_id) when is_binary(chat_id) do
     # Somehow this is fastest https://stackoverflow.com/a/52322926/2877738
     get(chat_id)
     |> Enum.reverse()

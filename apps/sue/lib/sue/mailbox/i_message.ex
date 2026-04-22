@@ -8,7 +8,7 @@ defmodule Sue.Mailbox.IMessage do
   alias Sue.Models.{Attachment, Chat, Message, Response}
 
   @update_interval 1_000
-  @cache_table :suestate_cache
+  @max_rowid_key {__MODULE__, :max_rowid}
 
   def start_link(args) do
     Logger.info("Starting IMessage genserver...")
@@ -119,8 +119,7 @@ defmodule Sue.Mailbox.IMessage do
   @spec set_new_max_rowid([Message.t(), ...]) :: [Message.t(), ...]
   defp set_new_max_rowid(msgs) do
     rowid = Enum.max_by(msgs, fn m -> m.id end).id
-    Subaru.Cache.put(@cache_table, "imsg_max_rowid", rowid)
-    # DB.set(:state, "imsg_max_rowid", rowid)
+    :persistent_term.put(@max_rowid_key, rowid)
     msgs
   end
 
@@ -134,13 +133,11 @@ defmodule Sue.Mailbox.IMessage do
     even still present in the DB.
   """
   def clear_max_rowid() do
-    Subaru.Cache.del!(@cache_table, "imsg_max_rowid")
-    # DB.del!(:state, "imsg_max_rowid")
+    :persistent_term.erase(@max_rowid_key)
   end
 
   defp get_current_max_rowid() do
-    # Check to see if we have one stored.
-    case Subaru.Cache.get!(@cache_table, "imsg_max_rowid") do
+    case :persistent_term.get(@max_rowid_key, nil) do
       nil -> query_imessage_max_rowid()
       rowid -> rowid
     end
@@ -163,7 +160,7 @@ defmodule Sue.Mailbox.IMessage do
   defp fetch_max_rowid(conn) do
     case Imessaged.DB.query(conn, "SELECT MAX(ROWID) FROM message;", []) do
       {:ok, [[rowid]]} when is_integer(rowid) ->
-        Subaru.Cache.put(@cache_table, "imsg_max_rowid", rowid)
+        :persistent_term.put(@max_rowid_key, rowid)
         Logger.info("Starting iMessage polling from ROWID #{rowid}")
         rowid
 

@@ -7,10 +7,9 @@ defmodule Sue.Application do
 
   def start(_type, _args) do
     children = [
+      Sue.Graph,
       Sue,
-      Sue.DB,
-      Sue.DB.RecentMessages,
-      Sue.AI
+      Sue.DB.RecentMessages
     ]
 
     children_imessage =

@@ -1,29 +1,30 @@
 defmodule Sue.Models.Poll do
-  @moduledoc false
+  @moduledoc """
+  A poll in a chat. At most one poll per chat at a time; creating a new poll
+  replaces the previous one. The id is derived from the chat id so the replace
+  semantics fall out of `Graph.put` for free.
+  """
 
-  @behaviour Subaru.Vertex
+  alias __MODULE__
 
   @enforce_keys [:chat_id, :topic, :options, :votes, :interface]
   defstruct [:chat_id, :topic, :options, :votes, :id, interface: :standard]
 
   @type interface() :: :standard | :platform
   @type t() :: %__MODULE__{
-          chat_id: Subaru.dbid(),
+          chat_id: bitstring(),
           topic: bitstring(),
           options: [bitstring()],
-          # k:AccountID, v:ChoiceIndex
+          # k: AccountID, v: ChoiceIndex
           votes: map(),
           interface: interface(),
-          id: Subaru.dbid() | nil
+          id: bitstring() | nil
         }
 
-  @collection "sue_polls"
-
-  alias __MODULE__
-
-  @spec new(Chat.t(), bitstring(), [bitstring(), ...], interface()) :: t
+  @spec new(Sue.Models.Chat.t(), bitstring(), [bitstring(), ...], interface()) :: t()
   def new(chat, topic, options, interface) do
     %Poll{
+      id: id_for(chat.id),
       chat_id: chat.id,
       topic: topic,
       options: options,
@@ -32,21 +33,10 @@ defmodule Sue.Models.Poll do
     }
   end
 
-  @spec from_doc(map()) :: t
-  def from_doc(doc) do
-    %Poll{
-      chat_id: doc["chat_id"],
-      topic: doc["topic"],
-      options: doc["options"],
-      votes: doc["votes"],
-      interface: Sue.Utils.string_to_atom(doc["interface"]),
-      id: doc["_id"]
-    }
-  end
+  @spec id_for(bitstring()) :: bitstring()
+  def id_for(chat_id), do: "poll:#{chat_id}"
 
-  def collection(), do: @collection
-
-  def doc(p) do
-    Sue.Utils.struct_to_map(p)
-  end
+  @doc "Build a Poll struct from a Subaru vertex map."
+  @spec from_map(map()) :: t()
+  def from_map(m), do: struct(__MODULE__, m)
 end

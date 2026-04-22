@@ -1,13 +1,15 @@
 defmodule Sue.Models.Chat do
-  @moduledoc false
+  @moduledoc """
+  A conversation on a platform — an iMessage chat, a Telegram group, a Discord
+  channel, or a 1:1 DM with any of those. `{platform, external_id}` is the
+  natural key; the Sue id is derived from it deterministically.
+  """
 
-  alias __MODULE__
   alias Sue.Models.Platform
+  alias __MODULE__
 
   @enforce_keys [:platform_id, :is_direct]
   defstruct [:platform_id, :is_direct, :id, is_ignored: false]
-
-  @behaviour Subaru.Vertex
 
   @type t() :: %__MODULE__{
           platform_id: {Platform.t(), bitstring() | integer()},
@@ -16,35 +18,19 @@ defmodule Sue.Models.Chat do
           id: nil | bitstring()
         }
 
-  @collection "sue_chats"
-
-  @spec resolve(t) :: t
-  def resolve(c) do
-    {platform, id} = c.platform_id
-    doc_search = %{platform: platform, id: id}
-    doc_insert = doc(c)
-
-    {:ok, new_chat} = Subaru.upsert(doc_search, doc_insert, %{}, @collection, true)
-    from_doc(new_chat)
-  end
-
-  @spec from_doc(map()) :: t
-  def from_doc(d) do
+  @spec new({Platform.t(), bitstring() | integer()}, boolean()) :: t()
+  def new({platform, external_id} = platform_id, is_direct) when is_atom(platform) do
     %Chat{
-      platform_id: {Sue.Utils.string_to_atom(d["platform"]), d["id"]},
-      is_direct: d["is_direct"],
-      is_ignored: d["is_ignored"],
-      id: d["_id"]
+      platform_id: platform_id,
+      is_direct: is_direct,
+      id: id_for(platform, external_id)
     }
   end
 
-  @impl Subaru.Vertex
-  def collection(), do: @collection
+  @spec id_for(Platform.t(), bitstring() | integer()) :: bitstring()
+  def id_for(platform, external_id), do: "chat:#{platform}:#{external_id}"
 
-  @impl Subaru.Vertex
-  def doc(%Chat{platform_id: {platform, id}} = c) do
-    Sue.Utils.struct_to_map(c, [:id, :platform_id])
-    |> Map.put(:platform, platform)
-    |> Map.put(:id, id)
-  end
+  @doc "Build a Chat struct from a Subaru vertex map."
+  @spec from_map(map()) :: t()
+  def from_map(m), do: struct(__MODULE__, m)
 end

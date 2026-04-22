@@ -89,8 +89,9 @@ config :ex_gram,
   adapter: ExGram.Adapter.Req,
   json_engine: Jason
 
-config :subaru,
-  dbname: "subaru_#{config_env()}"
+config :sue, Sue.Graph,
+  dir: Path.expand("../priv/khepri_#{config_env()}", __DIR__),
+  store_id: :"sue_graph_#{config_env()}"
 
 import_config "config.secret.exs"
 

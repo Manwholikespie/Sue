@@ -17,7 +17,7 @@ defmodule CommandTest do
   end
 
   test "defn" do
-    Schema.debug_clear_collections()
+    Schema.debug_clear()
 
     m = Message.from_debug("!megumin")
     response1 = Sue.debug_blocking_process_message(m)
@@ -37,7 +37,7 @@ defmodule CommandTest do
   end
 
   test "poll" do
-    Schema.debug_clear_collections()
+    Schema.debug_clear()
 
     m = Message.from_debug("!vote a")
     r = Sue.debug_blocking_process_message(m)
@@ -61,7 +61,7 @@ defmodule CommandTest do
   end
 
   test "ratelimit" do
-    Schema.debug_clear_collections()
+    Schema.debug_clear()
 
     m = Message.from_debug("!h_ratetest")
     r = Sue.debug_blocking_process_message(m)

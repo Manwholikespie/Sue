@@ -27,14 +27,14 @@ defmodule Sue.Commands.Defns do
     end
   end
 
-  def calldefn_type(_msg, %Defn{type: :text, val: val}), do: %Response{body: val}
+  def calldefn_type(_msg, %Defn{kind: :text, val: val}), do: %Response{body: val}
 
-  def calldefn_type(%Message{args: ""}, %Defn{type: :prompt}),
+  def calldefn_type(%Message{args: ""}, %Defn{kind: :prompt}),
     do: %Response{
       body: "This definition is a prompt, and must be called with args. See !help define"
     }
 
-  def calldefn_type(msg, %Defn{type: :prompt, val: val}) do
+  def calldefn_type(msg, %Defn{kind: :prompt, val: val}) do
     prompt = String.replace(val, "$args", msg.args)
 
     case Sue.Limits.check_rate("gpt:#{msg.account.id}", @gpt_rate_limit, msg.account.is_premium) do
@@ -50,7 +50,7 @@ defmodule Sue.Commands.Defns do
 
   Supported types:
     - text (default): Creates a simple text response
-    - prompt: Creates a template for asking ChatGPT
+    - prompt: Creates a template for asking Sue
 
   Examples:
   ---
@@ -116,17 +116,13 @@ defmodule Sue.Commands.Defns do
   """
   def c_phrases(msg) do
     defn_user = DB.get_defns_by_user(msg.account.id)
-
-    defn_user_ids =
-      defn_user
-      |> Enum.map(fn d -> d.id end)
-      |> MapSet.new()
+    defn_user_ids = Enum.map(defn_user, & &1.id)
 
     defn_user_by_type = group_defns_by_type(defn_user)
 
     defn_chat =
       DB.get_defns_by_chat(msg.chat.id)
-      |> Enum.filter(fn d -> not MapSet.member?(defn_user_ids, d.id) end)
+      |> Enum.reject(&(&1.id in defn_user_ids))
 
     defn_chat_by_type = group_defns_by_type(defn_chat)
 
@@ -148,9 +144,9 @@ defmodule Sue.Commands.Defns do
   @spec group_defns_by_type([Defn.t()]) :: %{atom() => [Defn.t()]}
   defp group_defns_by_type(defns) do
     defns
-    |> Enum.group_by(fn d -> d.type end)
-    |> Enum.map(fn {type, defs} ->
-      {type, Enum.uniq_by(defs, fn d -> d.var end)}
+    |> Enum.group_by(fn d -> d.kind end)
+    |> Enum.map(fn {kind, defs} ->
+      {kind, Enum.uniq_by(defs, fn d -> d.var end)}
     end)
     |> Enum.into(%{})
   end

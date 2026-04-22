@@ -45,7 +45,11 @@ defmodule Sue.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:subaru, in_umbrella: true},
+      {:subaru, path: "../../../subaru"},
+      {:bream, path: "../../../bream"},
+      # Used only by `mix sue.migrate.arango` to read the old ArangoDB.
+      # Drop once the migration is done.
+      {:arangox, "~> 0.7.0", only: [:dev, :test]},
       # until I reach a stable release
       {:imessaged, git: "https://github.com/Manwholikespie/imessaged"},
       {:timex, "~> 3.0"},
@@ -57,7 +61,6 @@ defmodule Sue.MixProject do
       # telegram - end
       {:jason, "~> 1.2"},
       {:hammer, "~> 6.1"},
-      {:openai, "~> 0.5.2"},
       {:replicate, "~> 1.1.0"},
       # discord
       {:nostrum, "~> 0.10"},

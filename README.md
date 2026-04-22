@@ -2,7 +2,7 @@
 
 # Sue
 
-Greetings and welcome to Sue, a chatbot for iMessage, Discord, and Telegram written in Elixir. Now with ChatGPT and Stable Diffusion!
+Greetings and welcome to Sue, a chatbot for iMessage, Discord, and Telegram written in Elixir. Now with Claude and Stable Diffusion!
 
 ## Demo
 
@@ -50,7 +50,7 @@ Telegram uses the slash (/) prefix instead. Sue will not respond to you unless y
 ## How do I run it?
 
 1. If you want to use iMessage, you need a mac with iMessage. You may be asked to enable disk access and Message control for this program (or, rather, Terminal/iTerm).
-2. If you want to use Telegram, you should make a Telegram API key. Look up how, it's pretty straightforward. Similarly if you want to use ChatGPT, make an OpenAI account and generate an API key.
+2. If you want to use Telegram, you should make a Telegram API key. Look up how, it's pretty straightforward. Claude responses come through Bream, which reuses your existing `~/.claude/` credentials — no extra API key needs to go in config.
 3. If you want to use Discord, again, make an API key, a bot, and under gateway intents enable message content intent.
 4. If you wish to disable any platforms such as Telegram or iMessage, modify the platform list under `config/config.exs` to what you wish to keep.
 6. This program uses [ArangoDB](https://www.arangodb.com/download-major/) as its primary database. In the years since I made this transition, someone there has sadly decided to drop support for MacOS. Eventually, I'll move back to the Mnesia implementation I was using for Sue, but until then, you'll need to install Docker. The following will only start Arango in Docker, as the rest of Sue requires direct access to macOS-specific frameworks and a running instance of Messages.app.
@@ -101,10 +101,6 @@ config :arangox,
   endpoints: "tcp://localhost:8529",
   username: "myuser",
   password: "mypass"
-
-config :openai,
-  api_key: "myapikey",
-  http_options: [recv_timeout: 40_000]
 
 config :replicate,
   replicate_api_token: "myapikey"

@@ -7,11 +7,11 @@ defmodule Sue.Commands.Gpt do
   @sd_rate_limit Application.compile_env(:sue, :sd_rate_limit)
 
   @doc """
-  Asks ChatGPT a question.
+  Ask Sue a question.
   Usage: !gpt write a poem about a bot named sue
   """
   def c_gpt(%Message{args: ""}) do
-    %Response{body: "Please provide a request to ChatGPT. See !help gpt"}
+    %Response{body: "Please provide something to ask. See !help gpt"}
   end
 
   def c_gpt(%Message{args: args, chat: chat, account: account}) do

@@ -1,13 +1,26 @@
 defmodule Sue.AI do
-  @moduledoc false
+  @moduledoc """
+  Claude-backed chat completion for Sue, via Bream.
 
-  use GenServer
+  Each call spins up an ephemeral Bream session, sends one user turn, streams
+  the assistant's text back, and closes the session. Conversation context
+  lives in Sue's `RecentMessages` cache and is flattened into the prompt —
+  Bream sessions themselves are short-lived and don't carry history across
+  calls.
+
+  Image generation still uses Replicate; unchanged from the pre-Bream
+  implementation.
+  """
 
   require Logger
 
-  alias Sue.Models.{Chat, Account}
+  alias Sue.Models.{Account, Chat}
 
-  @prompt """
+  @model "claude-sonnet-4-6"
+  @timeout 40_000
+  @fallback_error_message "Sorry, I timed out. Please try later, and consider asking me to keep it short."
+
+  @system_prompt """
   You are a helpful assistant known as Sue #REPLACEME. You can see recent messages and converse, but cannot execute commands directly. These commands are available to users:
 
   !1984: Shows an image of big brother (Tokino Sora)
@@ -36,133 +49,93 @@ defmodule Sue.AI do
   Avoid starting messages with greetings like "Hi [name]". Use names for personalization only when necessary, and if a user has only a numerical ID, opt for a neutral address. Respond in a friendly, conversational manner.
   """
 
-  @allowed_models ["gpt-5-nano", "gpt-4o-mini"]
-  @default_model "gpt-4o-mini"
-
-  def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: __MODULE__)
-  end
-
-  @impl true
-  def init(_args) do
-    {:ok, []}
-  end
-
-  @spec chat_completion(bitstring(), Chat.t(), Account.t(), bitstring()) :: bitstring()
-  def chat_completion(text, chat, account, model_version \\ @default_model)
-      when model_version in @allowed_models do
+  @doc """
+  Chat completion with recent-chat context. Returns the assistant's reply
+  as a string.
+  """
+  @spec chat_completion(bitstring(), Chat.t(), Account.t()) :: bitstring()
+  def chat_completion(text, %Chat{} = chat, %Account{} = account) do
     maxlen = if account.is_premium, do: 4_000, else: 1_000
 
-    prompt_user_count =
-      if chat.is_direct do
-        "in a chat with a user"
-      else
-        "in a groupchat with 2+ users"
-      end
+    situation =
+      if chat.is_direct, do: "in a chat with a user", else: "in a groupchat with 2+ users"
 
-    messages =
-      [
-        %{
-          role: "system",
-          content: String.replace(@prompt, "#REPLACEME", prompt_user_count)
-        }
-      ] ++
-        recent_messages_for_context(chat.id, chat.is_direct, text, maxlen) ++
-        [
-          %{
-            role: "user",
-            content: "#{Account.friendly_name(account)}: #{text}"
-          }
-        ]
+    system = String.replace(@system_prompt, "#REPLACEME", situation)
 
-    Logger.debug(messages |> inspect(pretty: true))
-    raw_chat_completion_messages(messages, model_version)
+    prompt = build_prompt_with_context(text, chat, account, maxlen)
+    ask_claude(system, prompt)
   end
 
   @doc """
-  Similar to chat_completion, but doesn't care about prior chat context or our default prompt.
+  One-shot text completion with no chat context. Used by prompt-type
+  definitions (`!define prompt`).
   """
-  @spec raw_chat_completion_messages([map()], bitstring()) :: bitstring()
-  def raw_chat_completion_messages(messages, model_version \\ @default_model)
-      when model_version in @allowed_models do
-    Logger.debug("Running chat_completion with #{model_version}")
+  @spec raw_chat_completion_text(bitstring()) :: bitstring()
+  def raw_chat_completion_text(text) when is_binary(text) do
+    ask_claude("You are a helpful assistant.", text)
+  end
 
-    case OpenAI.chat_completion(model: model_version, messages: messages) do
-      {:ok, response} ->
-        [%{"message" => %{"content" => content}}] = response.choices
-        Logger.debug("GPT response: " <> content)
-        content
+  # --- Bream glue ---
 
-      {:error, :timeout} ->
-        "Sorry, I timed out. Please try later, maybe additionally asking I keep my response short."
+  defp ask_claude(system_prompt, prompt) do
+    case Bream.start_session(
+           system_prompt: system_prompt,
+           model: @model,
+           timeout: @timeout
+         ) do
+      {:ok, session} ->
+        try do
+          session
+          |> Bream.stream(prompt, @timeout)
+          |> Enum.join()
+        rescue
+          e ->
+            Logger.error("[Sue.AI] bream stream failed: #{Exception.message(e)}")
+            @fallback_error_message
+        after
+          Bream.close(session)
+        end
 
-      {:error, %{"status" => status_message}} ->
-        Logger.error("[Sue.AI.chat_completion()] #{status_message}")
-        status_message
-
-      {:error, %{"message" => status_message}} ->
-        Logger.error("[Sue.AI.chat_completion()] #{status_message}")
-        status_message
+      {:error, reason} ->
+        Logger.error("[Sue.AI] bream start_session failed: #{inspect(reason)}")
+        @fallback_error_message
     end
   end
 
-  @spec raw_chat_completion_text(bitstring(), bitstring()) :: bitstring()
-  def raw_chat_completion_text(text, model_version \\ @default_model)
-      when model_version in @allowed_models do
-    messages = [
-      %{role: "developer", content: "You are a helpful assistant."},
-      %{role: "user", content: text}
-    ]
+  # --- Prompt building ---
 
-    raw_chat_completion_messages(messages, model_version)
+  defp build_prompt_with_context(text, chat, account, maxlen) do
+    history =
+      chat.id
+      |> Sue.DB.RecentMessages.get_tail()
+      |> cap_by_length(String.length(text), maxlen)
+      |> Enum.map_join("\n", &format_history_line/1)
+
+    current_line = "#{Account.friendly_name(account)}: #{text}"
+
+    if history == "",
+      do: current_line,
+      else: "Recent chat:\n#{history}\n\n#{current_line}"
   end
 
-  @spec recent_messages_for_context(Subaru.dbid(), boolean(), bitstring(), integer()) :: [map()]
-  defp recent_messages_for_context(chat_id, _is_direct, text, maxlen) do
-    Sue.DB.RecentMessages.get_tail(chat_id)
-    |> reduce_recent_messages(String.length(text), maxlen)
-    |> Enum.map(fn %{is_from_gpt: is_from_gpt, is_from_sue: is_from_sue} = m ->
-      role = if is_from_gpt, do: "assistant", else: "user"
+  defp format_history_line(%{is_from_gpt: true, body: body}), do: "Sue: #{body}"
+  defp format_history_line(%{is_from_sue: true, body: body}), do: "Sue: #{body}"
+  defp format_history_line(%{name: name, body: body}), do: "#{name}: #{body}"
 
-      name =
-        cond do
-          is_from_gpt ->
-            "ChatGPT"
+  defp cap_by_length(messages, base_length, maxlen) do
+    {_len, kept} =
+      Enum.reduce_while(messages, {base_length, []}, fn m, {len, acc} ->
+        new_len = len + String.length(m.body)
 
-          is_from_sue ->
-            "SueBot"
-
-          true ->
-            format_user_id(m.name)
-        end
-
-      content = if is_from_gpt, do: m.body, else: "#{name}: #{m.body}"
-      %{role: role, content: content}
-    end)
-  end
-
-  defp format_user_id("sue_users/" <> user_id) do
-    "User" <> user_id
-  end
-
-  defp format_user_id(otherwise), do: otherwise
-
-  @spec reduce_recent_messages([map()], integer(), integer()) :: {integer(), [map()]}
-  defp reduce_recent_messages(recent_messages, promptlen, maxlen) do
-    {_chars_used, messages} =
-      Enum.reduce_while(recent_messages, {promptlen, []}, fn m, acc ->
-        {len, msgs} = acc
-        newlen = len + String.length(m.body)
-
-        if newlen <= maxlen do
-          {:cont, {newlen, msgs ++ [m]}}
-        else
-          {:halt, acc}
-        end
+        if new_len <= maxlen,
+          do: {:cont, {new_len, acc ++ [m]}},
+          else: {:halt, {len, acc}}
       end)
 
-    messages
+    kept
   end
+
+  # --- Image generation (Replicate, unchanged) ---
 
   @doc """
   Huge thanks to https://github.com/cbh123/emoji for this.

@@ -13,8 +13,18 @@ defmodule Sue.Utils do
     end
   end
 
-  def dbid_number(dbid) do
-    Enum.at(String.split(dbid, "/"), 1)
+  @doc """
+  Pull a short display-friendly id out of a Subaru vertex id.
+
+  Handles both the new colon-delimited Sue ids (`"account:pa:telegram:12345"`
+  → `"12345"`) and ULIDs (no separator — returns the whole string). Nil is
+  passed through so callers can decide how to render "unknown user".
+  """
+  @spec dbid_number(String.t() | nil) :: String.t() | nil
+  def dbid_number(nil), do: nil
+
+  def dbid_number(dbid) when is_binary(dbid) do
+    dbid |> String.split(":") |> List.last()
   end
 
   def quoted(s) when is_bitstring(s) do

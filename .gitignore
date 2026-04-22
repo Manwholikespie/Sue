@@ -41,3 +41,6 @@ sue-*.tar
 # Dialyzer PLT files
 /priv/plts/*.plt
 /priv/plts/*.plt.hash
+
+# Khepri on-disk data (written wherever iex is started)
+/khepri*/

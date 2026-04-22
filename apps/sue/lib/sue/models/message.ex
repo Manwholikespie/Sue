@@ -80,18 +80,15 @@ defmodule Sue.Models.Message do
 
     time = parse_imessage_time(msg["date"])
 
-    paccount =
-      %PlatformAccount{platform_id: {:imessage, handle_id}}
-      |> PlatformAccount.resolve()
+    paccount = DB.resolve_paccount(%PlatformAccount{platform_id: {:imessage, handle_id}})
 
     chat =
-      %Chat{
+      DB.resolve_chat(%Chat{
         platform_id: {:imessage, chat_identifier || handle_id},
         is_direct: is_direct
-      }
-      |> Chat.resolve()
+      })
 
-    account = Account.from_paccount(paccount)
+    account = DB.resolve_paccount_to_account(paccount)
 
     {command, args, body} = command_args_from_body(:imessage, text)
 
@@ -137,18 +134,15 @@ defmodule Sue.Models.Message do
 
     command = parse_command_potentially_with_botname_suffix(command)
 
-    paccount =
-      %PlatformAccount{platform_id: {:telegram, msg.from.id}}
-      |> PlatformAccount.resolve()
+    paccount = DB.resolve_paccount(%PlatformAccount{platform_id: {:telegram, msg.from.id}})
 
     chat =
-      %Chat{
+      DB.resolve_chat(%Chat{
         platform_id: {:telegram, msg.chat.id},
         is_direct: msg.chat.type == "private"
-      }
-      |> Chat.resolve()
+      })
 
-    account = Account.from_paccount(paccount)
+    account = DB.resolve_paccount_to_account(paccount)
 
     %Message{
       platform: :telegram,
@@ -178,18 +172,15 @@ defmodule Sue.Models.Message do
   end
 
   def from_discord(msg) do
-    paccount =
-      %PlatformAccount{platform_id: {:discord, msg.author.id}}
-      |> PlatformAccount.resolve()
+    paccount = DB.resolve_paccount(%PlatformAccount{platform_id: {:discord, msg.author.id}})
 
     chat =
-      %Chat{
+      DB.resolve_chat(%Chat{
         platform_id: {:discord, msg.guild_id || msg.author.id},
         is_direct: is_nil(msg.guild_id)
-      }
-      |> Chat.resolve()
+      })
 
-    account = Account.from_paccount(paccount)
+    account = DB.resolve_paccount_to_account(paccount)
 
     {command, args, body} = command_args_from_body(:discord, msg.content)
 
@@ -218,15 +209,11 @@ defmodule Sue.Models.Message do
   end
 
   def from_debug(text) do
-    paccount =
-      %PlatformAccount{platform_id: {:debug, 0}}
-      |> PlatformAccount.resolve()
+    paccount = DB.resolve_paccount(%PlatformAccount{platform_id: {:debug, 0}})
 
-    chat =
-      %Chat{platform_id: {:debug, 0}, is_direct: true}
-      |> Chat.resolve()
+    chat = DB.resolve_chat(%Chat{platform_id: {:debug, 0}, is_direct: true})
 
-    account = Account.from_paccount(paccount)
+    account = DB.resolve_paccount_to_account(paccount)
 
     {command, args, body} = command_args_from_body(:debug, text)
 
@@ -300,7 +287,7 @@ defmodule Sue.Models.Message do
 
   @spec add_account_and_chat_to_graph(t()) :: t
   defp add_account_and_chat_to_graph(%Message{account: a, chat: c} = msg) do
-    {:ok, _dbid} = DB.add_user_chat_edge(a, c)
+    :ok = DB.add_user_chat_edge(a, c)
     msg
   end
 

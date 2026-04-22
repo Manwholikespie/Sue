@@ -8,7 +8,7 @@ defmodule Sue.Models.MessageTelegramTest do
   alias Sue.Models.Message
 
   setup do
-    Schema.debug_clear_collections()
+    Schema.debug_clear()
     :ok
   end
 

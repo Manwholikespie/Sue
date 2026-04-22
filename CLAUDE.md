@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Sue is an Elixir-based multi-platform chatbot that supports iMessage, Discord, and Telegram. It's built as an umbrella application with ChatGPT and Stable Diffusion integration.
+Sue is an Elixir-based multi-platform chatbot that supports iMessage, Discord, and Telegram. It's built as an umbrella application with Claude (via Bream) and Stable Diffusion integration.
 
 ## Architecture
 
@@ -87,10 +87,12 @@ mix dialyzer
    
 2. **config/config.secret.exs**: Contains API keys for:
    - Telegram bot token
-   - Discord bot token  
-   - OpenAI API key
+   - Discord bot token
    - Replicate API token
-   - ArangoDB credentials
+   - ArangoDB credentials (only needed while running `mix sue.migrate.arango`)
+
+   Claude access comes from Bream, which uses your existing `~/.claude/`
+   credentials — no API key needs to be in config.
 
 3. **Platform-specific**:
    - iMessage: Requires macOS with Messages.app
