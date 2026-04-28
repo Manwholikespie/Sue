@@ -86,15 +86,28 @@ mix dialyzer
    - Telegram bot token
    - Discord bot token
    - Replicate API token
-   - ArangoDB credentials (only needed while running `mix sue.migrate.arango`)
+   - ArangoDB credentials under `config :sue, :arango_migration` (only needed while running `mix sue.migrate.arango`)
 
    Claude access comes from Bream, which uses your existing `~/.claude/`
    credentials — no API key needs to be in config.
+
+   Production Khepri data is tied to the Erlang node name in Ra membership. On
+   ayame, stop the release and run the Arango migration as
+   `SUE_DISABLE_PLATFORMS=1 MIX_ENV=prod elixir --sname sue -S mix sue.migrate.arango`;
+   running bare `MIX_ENV=prod mix sue.migrate.arango` creates a
+   `:nonode@nohost` store that the named release can read inconsistently and
+   will hang on writes.
 
 3. **Platform-specific**:
    - iMessage: Requires macOS with Messages.app
    - Telegram: Commands register automatically on bot startup
    - Discord: Needs message content intent enabled
+
+### Known Upstream Issues
+
+- The production `:erts` code path workaround in `config/runtime.exs` is for a
+  Horus upstream bug: Horus asks for `:erlang` object code at runtime, but Mix
+  releases do not include `erts/ebin` on the code path by default.
 
 ## Adding New Commands
 

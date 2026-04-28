@@ -97,7 +97,7 @@ config :nostrum,
 config :desu_web, DesuWeb.Endpoint,
   secret_key_base: "Run this command: $ mix phx.gen.secret"
 
-config :arangox,
+config :sue, :arango_migration,
   endpoints: "tcp://localhost:8529",
   username: "myuser",
   password: "mypass"
@@ -127,7 +127,15 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
 12. To create a prod build, run `MIX_ENV=prod mix release` It should then tell you the path to the newly created executable.
 
-13. To run in interactive dev mode, you can run `iex -S mix`. Telegram command autocomplete is now registered automatically when the bot starts.
+13. To migrate Arango data into the production Khepri store, stop the release
+    first, then run the migration with the same Erlang node name the release
+    uses:
+
+```bash
+SUE_DISABLE_PLATFORMS=1 MIX_ENV=prod elixir --sname sue -S mix sue.migrate.arango
+```
+
+14. To run in interactive dev mode, you can run `iex -S mix`. Telegram command autocomplete is now registered automatically when the bot starts.
 
 ## How do I add a command?
 

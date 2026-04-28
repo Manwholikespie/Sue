@@ -6,7 +6,9 @@ khepri_test_dir =
     "sue-khepri-test-#{System.unique_integer([:positive])}"
   )
 
-config :khepri, default_ra_system: khepri_test_dir
+config :sue, Sue.Graph,
+  dir: khepri_test_dir,
+  store_id: :sue_graph_test
 
 # Print only warnings and errors during test
 config :logger, level: :warning

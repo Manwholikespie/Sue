@@ -3,10 +3,11 @@ defmodule Sue.Application do
 
   use Application
 
-  @platforms Application.compile_env(:sue, :platforms, [])
+  @configured_platforms Application.compile_env(:sue, :platforms, [])
 
   def start(_type, _args) do
     register_file_log_backends()
+    platforms = enabled_platforms()
 
     children = [
       Sue.Graph,
@@ -16,7 +17,7 @@ defmodule Sue.Application do
     ]
 
     children_imessage =
-      if Sue.Utils.contains?(@platforms, :imessage) do
+      if Sue.Utils.contains?(platforms, :imessage) do
         # Method used to avoid strange Dialyzer error...
         [
           Sue.Mailbox.IMessage
@@ -26,7 +27,7 @@ defmodule Sue.Application do
       end
 
     children_telegram =
-      if Sue.Utils.contains?(@platforms, :telegram) do
+      if Sue.Utils.contains?(platforms, :telegram) do
         token = Application.fetch_env!(:sue, :telegram_token)
         [{Sue.Mailbox.Telegram.Supervisor, [token: token]}]
       else
@@ -34,7 +35,7 @@ defmodule Sue.Application do
       end
 
     children_discord =
-      if Sue.Utils.contains?(@platforms, :discord) do
+      if Sue.Utils.contains?(platforms, :discord) do
         # Nostrum 0.10+ is an included_application (doesn't auto-start)
         # Start Nostrum first, then our consumer which will register itself
         [
@@ -57,5 +58,13 @@ defmodule Sue.Application do
     Enum.each([:file_log, :error_log], fn id ->
       _ = LoggerBackends.add({LoggerFileBackend, id})
     end)
+  end
+
+  defp enabled_platforms do
+    if truthy_env?("SUE_DISABLE_PLATFORMS"), do: [], else: @configured_platforms
+  end
+
+  defp truthy_env?(name) do
+    System.get_env(name) in ["1", "true", "TRUE", "yes", "YES"]
   end
 end

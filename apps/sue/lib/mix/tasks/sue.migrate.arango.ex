@@ -6,13 +6,12 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
   and edges in the new Khepri-backed `Sue.Graph`.
 
   Talks to Arango via plain HTTP (Req) — no `arangox` dep required. Reads
-  endpoint/credentials from the `config :arangox, ...` block in
-  `config/config.secret.exs` (kept under that key for continuity; the app
-  itself is gone). Make sure Arango is reachable before running.
+  endpoint/credentials from `config :sue, :arango_migration, ...` in
+  `config/config.secret.exs`. Make sure Arango is reachable before running.
 
   After a successful migration you can drop:
 
-    * the `config :arangox, ...` block in `config/config.secret.exs`
+    * the `config :sue, :arango_migration, ...` block in `config/config.secret.exs`
     * the ArangoDB container in `docker-compose.yml`
     * this Mix task once the data is verifiably migrated
 
@@ -20,6 +19,10 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
 
       mix sue.migrate.arango            # writes to Sue.Graph, prints counts
       mix sue.migrate.arango --dry-run  # reads and plans, writes nothing
+
+  In production, run it with the same Erlang node name as the release:
+
+      SUE_DISABLE_PLATFORMS=1 MIX_ENV=prod elixir --sname sue -S mix sue.migrate.arango
 
   ## Id translation
 
@@ -54,7 +57,8 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
     {opts, _, _} = OptionParser.parse(argv, switches: [dry_run: :boolean])
     dry_run? = Keyword.get(opts, :dry_run, false)
 
-    Mix.Task.run("app.start")
+    System.put_env("SUE_DISABLE_PLATFORMS", "1")
+    start_runtime!(dry_run?)
 
     config = arango_config()
 
@@ -70,10 +74,10 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
       )
     else
       Logger.info("Writing vertices to Sue.Graph…")
-      Enum.each(vertex_writes, &Graph.put/1)
+      :ok = Graph.put_many(vertex_writes)
 
       Logger.info("Writing edges to Sue.Graph…")
-      Enum.each(edge_writes, fn {from, type, to} -> Graph.link(from, type, to) end)
+      :ok = Graph.link_many(edge_writes)
 
       Graph.sync()
       Logger.info("Done. Vertices: #{length(vertex_writes)}  Edges: #{length(edge_writes)}")
@@ -82,18 +86,67 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
 
   # ---------- Arango I/O over plain HTTP (Req) ----------
 
+  defp start_runtime!(dry_run?) do
+    {:ok, _} = Application.ensure_all_started(:req)
+
+    unless dry_run? do
+      start_graph!()
+    end
+  end
+
+  defp start_graph! do
+    case Graph.start_link([]) do
+      {:ok, _pid} ->
+        :ok
+
+      {:error, {:already_started, _pid}} ->
+        :ok
+
+      {:error, reason} ->
+        raise "failed to start Sue.Graph for Arango migration: #{inspect(reason)}"
+    end
+  end
+
   defp arango_config do
+    config = Application.get_env(:sue, :arango_migration) || legacy_arangox_config()
+
     endpoint =
-      :arangox
-      |> Application.get_env(:endpoints, "http://localhost:8529")
+      config
+      |> Keyword.get(:endpoints, "http://localhost:8529")
+      |> normalize_endpoints()
       |> normalize_endpoint()
 
-    username = Application.fetch_env!(:arangox, :username)
-    password = Application.fetch_env!(:arangox, :password)
-    dbname = Application.get_env(:subaru, :dbname, "subaru_#{Mix.env()}")
+    username = Keyword.fetch!(config, :username)
+    password = Keyword.fetch!(config, :password)
+    dbname = Keyword.get(config, :dbname, "subaru_#{Mix.env()}")
 
     %{base_url: "#{endpoint}/_db/#{dbname}", auth: {:basic, "#{username}:#{password}"}}
   end
+
+  defp legacy_arangox_config do
+    # Backward-compatible read path for old private config. New configs should
+    # use :sue/:arango_migration so Mix does not warn about a configured
+    # application that is no longer a dependency.
+    config = Application.get_all_env(:arangox)
+
+    if config == [] do
+      raise """
+      missing Arango migration config.
+
+      Add this to config/config.secret.exs:
+
+          config :sue, :arango_migration,
+            endpoints: "tcp://localhost:8529",
+            username: "myuser",
+            password: "mypass"
+      """
+    end
+
+    Keyword.put_new(config, :dbname, Application.get_env(:subaru, :dbname, "subaru_#{Mix.env()}"))
+  end
+
+  defp normalize_endpoints([endpoint | _]), do: endpoint
+  defp normalize_endpoints(endpoint), do: endpoint
 
   # arangox accepted "tcp://" / "ssl://"; HTTP wants http/https.
   defp normalize_endpoint("tcp://" <> rest), do: "http://" <> rest
