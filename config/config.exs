@@ -12,41 +12,6 @@ if File.exists?(".env") do
   end)
 end
 
-config :desu_web,
-  generators: [context_app: false]
-
-# Configures the endpoint
-config :desu_web, DesuWeb.Endpoint,
-  url: [host: "localhost"],
-  render_errors: [
-    formats: [html: DesuWeb.ErrorHTML, json: DesuWeb.ErrorJSON],
-    layout: false
-  ],
-  pubsub_server: Desu.PubSub,
-  live_view: [signing_salt: "YEBB28eM"]
-
-# Configure esbuild (the version is required)
-config :esbuild,
-  version: "0.17.11",
-  default: [
-    args:
-      ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
-    cd: Path.expand("../apps/desu_web/assets", __DIR__),
-    env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
-  ]
-
-# Configure tailwind (the version is required)
-config :tailwind,
-  version: "3.2.7",
-  default: [
-    args: ~w(
-      --config=tailwind.config.js
-      --input=css/app.css
-      --output=../priv/static/assets/app.css
-    ),
-    cd: Path.expand("../apps/desu_web/assets", __DIR__)
-  ]
-
 # Configure Elixir's Logger. On Linux, if you want it in /var/log, I'll let you
 #   set up those permissions yourself. On Windows, idk where it ought to go.
 logger_dir =
@@ -55,9 +20,7 @@ logger_dir =
     _ -> "logs/"
   end
 
-config :logger,
-  backends: [:console, {LoggerFileBackend, :file_log}, {LoggerFileBackend, :error_log}],
-  format: "$time [$level] $message\n"
+config :logger, format: "$time [$level] $message\n"
 
 config :logger, :console, level: :debug
 
@@ -68,9 +31,6 @@ config :logger, :file_log,
 config :logger, :error_log,
   path: Path.join(logger_dir, "error.log"),
   level: :error
-
-# Use Jason for JSON parsing in Phoenix
-config :phoenix, :json_library, Jason
 
 config :hammer,
   backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 25, cleanup_interval_ms: 60_000 * 10]}

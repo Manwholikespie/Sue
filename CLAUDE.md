@@ -10,9 +10,6 @@ Sue is an Elixir-based multi-platform chatbot that supports iMessage, Discord, a
 
 ### Umbrella Structure
 - **apps/sue**: Core chatbot logic, command processing, and platform integrations
-- **apps/subaru**: Database abstraction layer using ArangoDB
-- **apps/desu**: Business logic for a social network leveraging Sue for group-chat integrations (not yet implemented)
-- **apps/desu_web**: Phoenix web interface for desu (not yet implemented)
 
 ### Key Components
 

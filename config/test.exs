@@ -1,14 +1,16 @@
 import Config
 
-# We don't run a server during test. If one is required,
-# you can enable the server option below.
-config :desu_web, DesuWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4002],
-  secret_key_base: "7cE/y3SoUvtWz0USNemOWQtEhg7GfCABeqWu4U5q+O9ZOJLuzeT/V6nxbwqdgumR",
-  server: false
+khepri_test_dir =
+  Path.join(
+    System.tmp_dir!(),
+    "sue-khepri-test-#{System.unique_integer([:positive])}"
+  )
+
+config :khepri, default_ra_system: khepri_test_dir
 
 # Print only warnings and errors during test
-config :logger, level: :debug
+config :logger, level: :warning
+config :logger, :console, level: :warning
 
 config :ex_gram,
   token: "test_token",
