@@ -11,7 +11,13 @@ defmodule Sue.Umbrella.MixProject do
       releases: [
         sue: [
           applications: [sue: :permanent, subaru: :permanent],
-          strip_beams: [keep: ["Docs"]]
+          strip_beams: [keep: ["Docs"]],
+          # horus 0.4.0 (transitive via khepri) calls `:code.get_object_code(:erlang)`
+          # at runtime, which needs `erts/ebin/*.beam` on the code path. Mix releases
+          # don't bundle those .beam files. include_erts: false makes the release rely
+          # on the system's OTP install, whose erts/ebin has them. Keep the system
+          # Erlang/OTP version in sync with what the release was built against.
+          include_erts: false
         ]
       ],
       dialyzer: [
