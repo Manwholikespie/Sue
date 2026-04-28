@@ -5,13 +5,16 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
   Reads every Arango collection Sue ever wrote to and rewrites it as vertices
   and edges in the new Khepri-backed `Sue.Graph`.
 
-  Uses the `config :arangox, ...` block from `config/config.secret.exs`, so make
-  sure Arango is reachable before running. After a successful migration you can
-  drop:
+  Talks to Arango via plain HTTP (Req) — no `arangox` dep required. Reads
+  endpoint/credentials from the `config :arangox, ...` block in
+  `config/config.secret.exs` (kept under that key for continuity; the app
+  itself is gone). Make sure Arango is reachable before running.
+
+  After a successful migration you can drop:
 
     * the `config :arangox, ...` block in `config/config.secret.exs`
-    * `{:arangox, ...}` from `apps/sue/mix.exs` deps
     * the ArangoDB container in `docker-compose.yml`
+    * this Mix task once the data is verifiably migrated
 
   Usage:
 
@@ -53,13 +56,13 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
 
     Mix.Task.run("app.start")
 
-    {:ok, conn} = connect_arango()
+    config = arango_config()
 
     Logger.info("Reading vertices from Arango…")
-    {id_map, vertex_writes} = read_vertices(conn)
+    {id_map, vertex_writes} = read_vertices(config)
 
     Logger.info("Reading edges from Arango…")
-    edge_writes = read_edges(conn, id_map)
+    edge_writes = read_edges(config, id_map)
 
     if dry_run? do
       Logger.info(
@@ -77,55 +80,67 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
     end
   end
 
-  # ---------- Arango I/O ----------
+  # ---------- Arango I/O over plain HTTP (Req) ----------
 
-  defp connect_arango do
-    endpoints = Application.fetch_env!(:arangox, :endpoints)
+  defp arango_config do
+    endpoint =
+      :arangox
+      |> Application.get_env(:endpoints, "http://localhost:8529")
+      |> normalize_endpoint()
+
     username = Application.fetch_env!(:arangox, :username)
     password = Application.fetch_env!(:arangox, :password)
     dbname = Application.get_env(:subaru, :dbname, "subaru_#{Mix.env()}")
 
-    Arangox.start_link(
-      endpoints: endpoints,
-      username: username,
-      password: password,
-      database: dbname,
-      client: Arangox.MintClient
-    )
+    %{base_url: "#{endpoint}/_db/#{dbname}", auth: {:basic, "#{username}:#{password}"}}
   end
 
-  # Stream all docs from an Arango collection.
-  defp stream_collection(conn, name) do
-    Stream.resource(
-      fn -> {:start, name} end,
-      fn
-        {:start, coll} ->
-          query = "FOR doc IN #{coll} RETURN doc"
+  # arangox accepted "tcp://" / "ssl://"; HTTP wants http/https.
+  defp normalize_endpoint("tcp://" <> rest), do: "http://" <> rest
+  defp normalize_endpoint("ssl://" <> rest), do: "https://" <> rest
+  defp normalize_endpoint(url), do: url
 
-          Arangox.transaction(conn, fn c ->
-            cursor = Arangox.cursor(c, query, %{})
-            docs = cursor |> Enum.flat_map(&(&1.body["result"] || []))
-            {docs, :done}
-          end)
-          |> case do
-            {:ok, {docs, :done}} -> {docs, :done}
-            {:error, _} = err -> throw(err)
-          end
+  # Walk an entire collection by paging Arango's cursor API.
+  # Initial POST /_api/cursor creates the cursor; subsequent PUTs to
+  # /_api/cursor/<id> fetch the remaining pages until hasMore: false.
+  defp fetch_all(config, collection) do
+    body = %{query: "FOR doc IN #{collection} RETURN doc", batchSize: 1000}
+    first = http_request(config, :post, "/_api/cursor", body)
+    accumulate(config, first, first["result"] || [])
+  end
 
-        :done ->
-          {:halt, :done}
-      end,
-      fn _ -> :ok end
-    )
+  defp accumulate(config, %{"hasMore" => true, "id" => id}, acc) do
+    next = http_request(config, :put, "/_api/cursor/#{id}", %{})
+    accumulate(config, next, acc ++ (next["result"] || []))
+  end
+
+  defp accumulate(_config, _resp, acc), do: acc
+
+  defp http_request(config, method, path, body) do
+    url = config.base_url <> path
+
+    case Req.request(method: method, url: url, auth: config.auth, json: body) do
+      {:ok, %{status: status, body: %{"error" => true} = err}} ->
+        raise "Arango error (HTTP #{status}, code #{err["errorNum"]}): #{err["errorMessage"]}"
+
+      {:ok, %{status: status, body: body}} when status in 200..299 ->
+        body
+
+      {:ok, %{status: status, body: body}} ->
+        raise "Arango HTTP #{status}: #{inspect(body)}"
+
+      {:error, reason} ->
+        raise "Arango request failed: #{inspect(reason)}"
+    end
   end
 
   # ---------- Vertex reading + id translation ----------
 
   # Walk all vertex collections, produce (a) an old→new id map for edge fixup,
   # and (b) the list of typed vertex structs ready to Graph.put.
-  defp read_vertices(conn) do
+  defp read_vertices(config) do
     Enum.reduce(@arango_vertex_collections, {%{}, []}, fn coll, {id_map, writes} ->
-      docs = stream_collection(conn, coll) |> Enum.to_list()
+      docs = fetch_all(config, coll)
       Logger.info("  #{coll}: #{length(docs)} docs")
 
       Enum.reduce(docs, {id_map, writes}, fn doc, {acc_map, acc_writes} ->
@@ -205,9 +220,9 @@ defmodule Mix.Tasks.Sue.Migrate.Arango do
 
   # ---------- Edge reading ----------
 
-  defp read_edges(conn, id_map) do
+  defp read_edges(config, id_map) do
     Enum.flat_map(@arango_edge_collections, fn coll ->
-      docs = stream_collection(conn, coll) |> Enum.to_list()
+      docs = fetch_all(config, coll)
       type = edge_type_for(coll)
       Logger.info("  #{coll}: #{length(docs)} docs")
 

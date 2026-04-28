@@ -47,9 +47,6 @@ defmodule Sue.MixProject do
     [
       {:subaru, path: "../../../subaru"},
       {:bream, path: "../../../bream"},
-      # Used only by `mix sue.migrate.arango` to read the old ArangoDB.
-      # Drop once the migration is done.
-      {:arangox, "~> 0.7.0", only: [:dev, :test]},
       # until I reach a stable release
       {:imessaged, path: "../../../imessaged"},
       {:timex, "~> 3.0"},
