@@ -40,6 +40,14 @@ config :sue,
   # options include :discord, :imessage, :telegram - :debug is just for testing
   platforms: [:debug, :discord, :imessage, :telegram],
   chat_db_path: Path.join(System.user_home(), "Library/Messages/chat.db"),
+  interjection: [
+    enabled: true,
+    base_url: "http://localhost:11434/v1",
+    model: "LiquidAI/lfm2.5-1.2b-instruct:q5_k_m",
+    timeout: 8_000,
+    threshold: 0.7,
+    invoke_rate_limit: {:timer.minutes(5), 20}
+  ],
   # Rate limits
   cmd_rate_limit: {:timer.seconds(5), 5},
   gpt_rate_limit: {:timer.hours(24), 50},

@@ -4,6 +4,7 @@ defmodule Sue do
   use GenServer
   require Logger
 
+  alias Sue.AI.Interjection
   alias Sue.Commands.{Core, Defns}
   alias Sue.Models.{Message, Response, Attachment, Account}
 
@@ -46,6 +47,11 @@ defmodule Sue do
     {:noreply, state}
   end
 
+  def handle_cast({:interject, msg}, state) do
+    spawn(__MODULE__, :execute_interjection_in_background, [msg])
+    {:noreply, state}
+  end
+
   @spec send_response(Message.t(), Response.t() | Attachment.t() | [Attachment.t()]) :: any()
   def send_response(%Message{platform: :imessage} = msg, %Response{} = rsp) do
     Logger.info("[Sue] Created response: #{rsp}")
@@ -82,7 +88,14 @@ defmodule Sue do
   def debug_blocking_process_message(msg), do: execute_command(get_commands(), msg)
 
   @spec process_message(Message.t()) :: :ok
-  defp process_message(%Message{is_ignorable: true}), do: :ok
+  defp process_message(%Message{is_ignorable: true} = msg) do
+    if Interjection.candidate?(msg) do
+      Logger.info("[Sue] Considering AI interjection: #{inspect(msg)}")
+      GenServer.cast(__MODULE__, {:interject, msg})
+    end
+
+    :ok
+  end
 
   defp process_message(msg) do
     Logger.info("[Sue] Processing: #{inspect(msg)}")
@@ -136,6 +149,24 @@ defmodule Sue do
     :ok
   end
 
+  def execute_interjection_in_background(msg) do
+    {u_secs, :ok} =
+      :timer.tc(fn ->
+        case Interjection.reply(msg) do
+          {:ok, rsp} ->
+            log_and_cache_recent(msg, rsp)
+            send_response(msg, rsp)
+
+          :ignore ->
+            :ok
+        end
+      end)
+
+    Logger.info("[Sue] Considered AI interjection in #{u_secs / 1_000_000}s")
+
+    :ok
+  end
+
   @spec execute_command(map(), Message.t()) :: Response.t() | Attachment.t() | [Attachment.t()]
   defp execute_command(_, %Message{account: %Account{is_banned: true, ban_reason: ban_reason}}) do
     %Response{
@@ -168,7 +199,8 @@ defmodule Sue do
   defp log_and_cache_recent(msg, nil) do
     Sue.DB.RecentMessages.add(msg.chat.id, %{
       name: Account.friendly_name(msg.account),
-      body: msg.body,
+      body: Interjection.format_recent_body(msg),
+      time: msg.time,
       is_from_sue: false,
       is_from_gpt: false
     })
@@ -180,6 +212,7 @@ defmodule Sue do
     Sue.DB.RecentMessages.add(msg.chat.id, %{
       name: "sue",
       body: "<media>",
+      time: DateTime.utc_now(),
       is_from_sue: true,
       is_from_gpt: false
     })
@@ -193,6 +226,7 @@ defmodule Sue do
     Sue.DB.RecentMessages.add(msg.chat.id, %{
       name: "sue",
       body: if(rsp.body != "", do: rsp.body, else: "<media>"),
+      time: DateTime.utc_now(),
       is_from_sue: true,
       is_from_gpt: rsp.is_from_gpt
     })

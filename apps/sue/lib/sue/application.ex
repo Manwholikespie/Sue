@@ -6,10 +6,13 @@ defmodule Sue.Application do
   @platforms Application.compile_env(:sue, :platforms, [])
 
   def start(_type, _args) do
+    register_file_log_backends()
+
     children = [
       Sue.Graph,
       Sue,
-      Sue.DB.RecentMessages
+      Sue.DB.RecentMessages,
+      Sue.AI.Sessions
     ]
 
     children_imessage =
@@ -48,5 +51,11 @@ defmodule Sue.Application do
       children ++ children_imessage ++ children_telegram ++ children_discord,
       opts
     )
+  end
+
+  defp register_file_log_backends do
+    Enum.each([:file_log, :error_log], fn id ->
+      _ = LoggerBackends.add({LoggerFileBackend, id})
+    end)
   end
 end

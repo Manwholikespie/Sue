@@ -76,7 +76,9 @@ defmodule Sue.Mailbox.Telegram do
     text
     |> split_message()
     |> Enum.reduce_while({:ok, []}, fn chunk, {:ok, acc} ->
-      case ExGram.send_message(chat_id, chunk, bot: @bot_name) do
+      {plain, entities} = ExGram.Markdown.to_entities(chunk)
+
+      case ExGram.send_message(chat_id, plain, entities: entities, bot: @bot_name) do
         {:ok, message} ->
           {:cont, {:ok, [message | acc]}}
 

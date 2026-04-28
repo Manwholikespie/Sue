@@ -7,8 +7,8 @@ defmodule Sue.DB.RecentMessages do
     !gpt can have the context of previous questions it was asked.
     !desu can add the last message to the quote page of whoever sent it.
 
-  1000 chats only takes up around 10MB of memory storing 5 previous messages each
-  of length 1000. Don't bother persisting anything.
+  1000 chats only takes up around 20MB of memory storing 10 previous messages
+  each of length 1000. Don't bother persisting anything.
   """
 
   use GenServer
@@ -17,8 +17,9 @@ defmodule Sue.DB.RecentMessages do
 
   @type queue() :: Queue.queue()
 
-  # Keep 6 prev messages per chat
-  @context_length 6
+  # Keep 10 prev messages per chat. This feeds both !gpt context and the local
+  # interjection gate.
+  @context_length 10
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)

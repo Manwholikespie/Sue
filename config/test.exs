@@ -20,6 +20,11 @@ config :ex_gram,
 
 config :sue,
   cmd_rate_limit: {:timer.seconds(5), 5000},
+  interjection: [
+    enabled: false,
+    invoke_rate_limit: nil,
+    gpt_rate_limit: nil
+  ],
   query_debug: false,
   # Tests use Message.from_debug/1 and Sue.debug_blocking_process_message/1
   # exclusively. Starting real platform adapters pulls in iMessage DB access

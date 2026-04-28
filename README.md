@@ -45,12 +45,12 @@ The following commands are currently supported:
 !vote
 ```
 
-Telegram uses the slash (/) prefix instead. Sue will not respond to you unless you use the proper prefix. **Do not just message her "hi", expecting a miracle**. You would be amazed how many people do. Discord uses exclamation mark same as iMessage.
+Telegram uses the slash (/) prefix instead. Discord uses exclamation mark same as iMessage. Sue can also run a small local Ollama model as an interjection gate; when enabled, ordinary chat messages are checked against the last 10 messages in the chat and Sue only asks the smarter Claude-backed path to respond when the local model says the latest message is relevant.
 
 ## How do I run it?
 
 1. If you want to use iMessage, you need a mac with iMessage. You may be asked to enable disk access and Message control for this program (or, rather, Terminal/iTerm).
-2. If you want to use Telegram, you should make a Telegram API key. Look up how, it's pretty straightforward. Claude responses come through Bream, which reuses your existing `~/.claude/` credentials — no extra API key needs to go in config.
+2. If you want to use Telegram, you should make a Telegram API key. Look up how, it's pretty straightforward. Claude responses come through Bream, which reuses your existing `~/.claude/` credentials — no extra API key needs to go in config. Automatic interjection uses Ollama's OpenAI-compatible endpoint by default: `http://localhost:11434/v1` with `LiquidAI/lfm2.5-1.2b-instruct:q5_k_m`.
 3. If you want to use Discord, again, make an API key, a bot, and under gateway intents enable message content intent.
 4. If you wish to disable any platforms such as Telegram or iMessage, modify the platform list under `config/config.exs` to what you wish to keep.
 6. This program uses [ArangoDB](https://www.arangodb.com/download-major/) as its primary database. In the years since I made this transition, someone there has sadly decided to drop support for MacOS. Eventually, I'll move back to the Mnesia implementation I was using for Sue, but until then, you'll need to install Docker. The following will only start Arango in Docker, as the rest of Sue requires direct access to macOS-specific frameworks and a running instance of Messages.app.

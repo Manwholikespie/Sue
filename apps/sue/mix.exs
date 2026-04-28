@@ -51,12 +51,16 @@ defmodule Sue.MixProject do
       # Drop once the migration is done.
       {:arangox, "~> 0.7.0", only: [:dev, :test]},
       # until I reach a stable release
-      {:imessaged, git: "https://github.com/Manwholikespie/imessaged"},
+      {:imessaged, path: "../../../imessaged"},
       {:timex, "~> 3.0"},
       {:logger_file_backend, "~> 0.0.10"},
+      {:logger_backends, "~> 1.0"},
       {:phoenix_pubsub, "~> 2.0"},
       # telegram - start
       {:ex_gram, "~> 0.65"},
+      # Powers ExGram.Markdown.to_entities/1 — Claude's CommonMark output is
+      # converted to Telegram MessageEntity structs at send time.
+      {:mdex, "~> 0.11"},
       {:req, "~> 0.5.17"},
       # telegram - end
       {:jason, "~> 1.2"},
