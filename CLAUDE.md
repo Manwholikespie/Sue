@@ -102,6 +102,13 @@ mix dialyzer
    - iMessage: Requires macOS with Messages.app
    - Telegram: Commands register automatically on bot startup
    - Discord: Needs message content intent enabled
+   - Interjection: startup warms the configured Ollama/OpenAI-compatible model.
+     If `:warmup_required` is true and the warmup fails, Sue startup fails
+     before platform adapters come online. Use `SUE_DISABLE_PLATFORMS=1` for
+     migration-only runs that should not touch Ollama or external platforms.
+     `:ollama_options` is sent as the Ollama `options` payload; ayame defaults
+     to `Bream.Provider.OllamaChat`, `qwen3:0.6b`, `think: false`, and
+     `%{num_gpu: 0}`.
 
 ### Known Upstream Issues
 

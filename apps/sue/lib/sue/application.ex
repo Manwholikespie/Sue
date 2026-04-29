@@ -2,56 +2,60 @@ defmodule Sue.Application do
   @moduledoc false
 
   use Application
+  require Logger
 
   @configured_platforms Application.compile_env(:sue, :platforms, [])
 
   def start(_type, _args) do
     register_file_log_backends()
-    platforms = enabled_platforms()
 
-    children = [
-      Sue.Graph,
-      Sue,
-      Sue.DB.RecentMessages,
-      Sue.AI.Sessions
-    ]
+    with :ok <- warm_interjection_classifier() do
+      platforms = enabled_platforms()
 
-    children_imessage =
-      if Sue.Utils.contains?(platforms, :imessage) do
-        # Method used to avoid strange Dialyzer error...
-        [
-          Sue.Mailbox.IMessage
-        ]
-      else
-        []
-      end
+      children = [
+        Sue.Graph,
+        Sue,
+        Sue.DB.RecentMessages,
+        Sue.AI.Sessions
+      ]
 
-    children_telegram =
-      if Sue.Utils.contains?(platforms, :telegram) do
-        token = Application.fetch_env!(:sue, :telegram_token)
-        [{Sue.Mailbox.Telegram.Supervisor, [token: token]}]
-      else
-        []
-      end
+      children_imessage =
+        if Sue.Utils.contains?(platforms, :imessage) do
+          # Method used to avoid strange Dialyzer error...
+          [
+            Sue.Mailbox.IMessage
+          ]
+        else
+          []
+        end
 
-    children_discord =
-      if Sue.Utils.contains?(platforms, :discord) do
-        # Nostrum 0.10+ is an included_application (doesn't auto-start)
-        # Start Nostrum first, then our consumer which will register itself
-        [
-          Nostrum.Application,
-          Sue.Mailbox.Discord
-        ]
-      else
-        []
-      end
+      children_telegram =
+        if Sue.Utils.contains?(platforms, :telegram) do
+          token = Application.fetch_env!(:sue, :telegram_token)
+          [{Sue.Mailbox.Telegram.Supervisor, [token: token]}]
+        else
+          []
+        end
 
-    opts = [strategy: :one_for_one, name: Sue.Supervisor]
+      children_discord =
+        if Sue.Utils.contains?(platforms, :discord) do
+          # Nostrum 0.10+ is an included_application (doesn't auto-start)
+          # Start Nostrum first, then our consumer which will register itself
+          [
+            Nostrum.Application,
+            Sue.Mailbox.Discord
+          ]
+        else
+          []
+        end
 
-    Supervisor.start_link(
-      children ++ children_imessage ++ children_telegram ++ children_discord,
-      opts
-    )
+      opts = [strategy: :one_for_one, name: Sue.Supervisor]
+
+      Supervisor.start_link(
+        children ++ children_imessage ++ children_telegram ++ children_discord,
+        opts
+      )
+    end
   end
 
   defp register_file_log_backends do
@@ -62,6 +66,37 @@ defmodule Sue.Application do
 
   defp enabled_platforms do
     if truthy_env?("SUE_DISABLE_PLATFORMS"), do: [], else: @configured_platforms
+  end
+
+  defp warm_interjection_classifier do
+    config = Application.get_env(:sue, :interjection, [])
+
+    cond do
+      truthy_env?("SUE_DISABLE_PLATFORMS") ->
+        :ok
+
+      not Keyword.get(config, :enabled, true) ->
+        :ok
+
+      not Keyword.get(config, :warmup, true) ->
+        :ok
+
+      true ->
+        case Sue.AI.Interjection.warmup(config) do
+          :ok ->
+            Logger.info("[Sue.Interjection] classifier warmup complete")
+            :ok
+
+          {:error, reason} ->
+            if Keyword.get(config, :warmup_required, true) do
+              Logger.error("[Sue.Interjection] classifier warmup failed: #{inspect(reason)}")
+              {:error, {:interjection_warmup_failed, reason}}
+            else
+              Logger.warning("[Sue.Interjection] classifier warmup failed: #{inspect(reason)}")
+              :ok
+            end
+        end
+    end
   end
 
   defp truthy_env?(name) do

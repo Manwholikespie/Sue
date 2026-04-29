@@ -37,16 +37,18 @@ defmodule Sue.AI.InterjectionTest do
       end
 
     chat_client = fn request ->
-      assert request[:base_url] == "http://localhost:11434/v1"
-      assert request[:model] == "LiquidAI/lfm2.5-1.2b-instruct:q5_k_m"
+      assert request[:base_url] == "http://localhost:11434"
+      assert request[:provider] == Bream.Provider.OllamaChat
+      assert request[:model] == "qwen3:0.6b"
       assert request[:temperature] == 0
       assert request[:response_format] == %{"type" => "json_object"}
+      assert request[:extra_body] == %{"options" => %{"num_gpu" => 0}}
 
       [%{role: "system"}, %{role: "user", content: content}] = request[:messages]
       refute content =~ "1. User1: message 1"
       assert content =~ "User2: message 2"
       assert content =~ "10. User11: message 11"
-      assert content =~ "The final line is the latest message"
+      assert content =~ "Classify only the latest message"
 
       {:ok,
        assistant(%{
@@ -60,12 +62,80 @@ defmodule Sue.AI.InterjectionTest do
              message(body: "Sue, answer this")
              |> Interjection.decide(
                chat_client: chat_client,
-               recent_messages: recent_messages
+               recent_messages: recent_messages,
+               ollama_options: %{num_gpu: 0}
              )
 
     assert decision.should_interject
     assert decision.confidence == 0.91
     assert decision.reason == "addressed Sue"
+  end
+
+  test "warmup sends a real classifier request to Bream Chat" do
+    chat_client = fn request ->
+      assert request[:base_url] == "http://localhost:11434"
+      assert request[:provider] == Bream.Provider.OllamaChat
+      assert request[:model] == "qwen3:0.6b"
+      assert request[:temperature] == 0
+      assert request[:timeout] == 123_000
+      assert request[:max_tokens] == 96
+      assert request[:response_format] == %{"type" => "json_object"}
+      assert request[:extra_body] == %{"options" => %{"num_gpu" => 0}}
+
+      [%{role: "system", content: system}, %{role: "user", content: content}] = request[:messages]
+      assert system =~ "Classify the latest chat message"
+      assert content =~ "Latest speaker: Startup"
+      assert content =~ "Classify only the latest message"
+
+      {:ok, assistant(%{should_interject: false, confidence: 0.0, reason: "warm"})}
+    end
+
+    assert :ok =
+             Interjection.warmup(
+               enabled: true,
+               chat_client: chat_client,
+               warmup_timeout: 123_000,
+               ollama_options: [num_gpu: 0]
+             )
+  end
+
+  test "warmup rejects invalid classifier JSON" do
+    assert {:error, {:invalid_warmup_response, {:invalid_decision_json, "ok"}}} =
+             Interjection.warmup(
+               enabled: true,
+               chat_client: fn _request ->
+                 {:ok, %AssistantMessage{content: [%TextBlock{text: "ok"}]}}
+               end
+             )
+  end
+
+  test "warmup returns provider errors" do
+    assert {:error, :timeout} =
+             Interjection.warmup(
+               enabled: true,
+               chat_client: fn _request -> {:error, :timeout} end
+             )
+  end
+
+  test "decide accepts provider-style confidence_number" do
+    chat_client = fn _request ->
+      {:ok,
+       assistant(%{
+         should_interject: true,
+         confidence_number: 85,
+         reason: "addressed Sue"
+       })}
+    end
+
+    assert {:ok, decision} =
+             message(body: "hey sue, what is 2+2")
+             |> Interjection.decide(
+               chat_client: chat_client,
+               recent_messages: [%{name: "Robert", body: "hey sue, what is 2+2"}]
+             )
+
+    assert decision.should_interject
+    assert decision.confidence == 1.0
   end
 
   test "reply invokes Claude-backed Sue AI when the classifier says yes" do

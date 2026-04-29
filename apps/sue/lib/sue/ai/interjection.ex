@@ -26,26 +26,39 @@ defmodule Sue.AI.Interjection do
               raw: nil
   end
 
-  @default_base_url "http://localhost:11434/v1"
-  @default_model "LiquidAI/lfm2.5-1.2b-instruct:q5_k_m"
+  @default_base_url "http://localhost:11434"
+  @default_model "qwen3:0.6b"
+  @default_provider Bream.Provider.OllamaChat
   @default_timeout 8_000
+  @default_max_tokens 96
+  @default_warmup_timeout 120_000
   @default_threshold 0.7
   @default_invoke_rate_limit {:timer.minutes(5), 20}
   @default_response_format %{"type" => "json_object"}
+  @provider_opts [:api_key, :headers, :provider, :http_client, :think]
 
   @system_prompt """
-  You decide whether Sue, a group-chat bot, should interject by asking a smarter AI model.
+  Classify the latest chat message.
 
-  You are only a gatekeeper. Do not answer the user. Read the recent transcript and decide if the latest message should be processed by Sue's Claude-backed AI.
+  Return JSON only with should_interject, confidence, reason.
 
-  Return only a JSON object with these keys:
-  - should_interject: boolean
-  - confidence: number from 0.0 to 1.0
-  - reason: short string
+  TRUE: the latest message asks Sue, the bot, or an AI a question or request.
 
-  Prefer false. Return true only when the latest message clearly invites Sue (addresses her by name, asks the bot/AI for help, asks for interpretation, opinion, or commentary on something just said). Self-notes ("reminding myself to...", "note to self", "TIL...", venting), acknowledgements ("ok", "thanks", "lol"), commands for other bots, status updates, and ordinary conversation between humans should always return false — even in a direct chat with Sue.
+  FALSE: greeting, acknowledgement, status update, ordinary human chat, command for another bot, or mention of Sue without asking her.
 
-  Media markers such as <media:image> mean an attachment was present; you cannot see the pixels. Only return true for media when the surrounding text or chat context makes Sue's response useful.
+  The boolean must match the label. Media markers such as <media:image> mean an attachment was present; classify from the surrounding text and chat context only.
+  """
+
+  @warmup_user_prompt """
+  Chat kind: direct chat with Sue
+  Latest speaker: Startup
+  Latest message text: hello
+  Latest message has media: false
+
+  Recent transcript for context only. Classify only the latest message:
+  1. Startup: hello
+
+  Return the classifier JSON for the latest message only.
   """
 
   @doc """
@@ -83,13 +96,11 @@ defmodule Sue.AI.Interjection do
         model: Keyword.get(opts, :model),
         messages: messages,
         temperature: Keyword.get(opts, :temperature, 0),
-        max_tokens: Keyword.get(opts, :max_tokens, 220),
+        max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens),
         timeout: Keyword.get(opts, :timeout),
         response_format: Keyword.get(opts, :response_format, @default_response_format)
       ]
-      |> Keyword.merge(
-        Keyword.take(opts, [:api_key, :headers, :provider, :http_client, :extra_body, :think])
-      )
+      |> Keyword.merge(provider_opts(opts))
       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
 
     chat_client = Keyword.get(opts, :chat_client, &complete_with_bream/1)
@@ -97,6 +108,55 @@ defmodule Sue.AI.Interjection do
     case chat_client.(request) do
       {:ok, message} ->
         parse_decision(assistant_text(message))
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:invalid_chat_response, other}}
+    end
+  end
+
+  @doc """
+  Performs a startup classifier request so Ollama loads the configured model
+  before Sue's platform adapters begin processing messages.
+  """
+  @spec warmup(keyword()) :: :ok | {:error, term()}
+  def warmup(overrides \\ []) do
+    opts = opts(overrides)
+
+    if Keyword.get(opts, :enabled, true) do
+      do_warmup(opts)
+    else
+      :ok
+    end
+  end
+
+  defp do_warmup(opts) do
+    request =
+      [
+        base_url: Keyword.get(opts, :base_url),
+        model: Keyword.get(opts, :model),
+        messages: [
+          %{role: "system", content: @system_prompt},
+          %{role: "user", content: @warmup_user_prompt}
+        ],
+        temperature: Keyword.get(opts, :temperature, 0),
+        max_tokens: Keyword.get(opts, :warmup_max_tokens, Keyword.get(opts, :max_tokens)),
+        timeout: Keyword.get(opts, :warmup_timeout, @default_warmup_timeout),
+        response_format: Keyword.get(opts, :response_format, @default_response_format)
+      ]
+      |> Keyword.merge(provider_opts(opts))
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+
+    chat_client = Keyword.get(opts, :chat_client, &complete_with_bream/1)
+
+    case chat_client.(request) do
+      {:ok, message} ->
+        case parse_decision(assistant_text(message)) do
+          {:ok, %Decision{}} -> :ok
+          {:error, reason} -> {:error, {:invalid_warmup_response, reason}}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -144,6 +204,8 @@ defmodule Sue.AI.Interjection do
   defp maybe_reply(msg, opts) do
     case decide(msg, opts) do
       {:ok, %Decision{} = decision} ->
+        log_classifier_decision(decision)
+
         if should_interject?(decision, opts) do
           invoke_sue_ai(msg, decision, opts)
         else
@@ -161,6 +223,12 @@ defmodule Sue.AI.Interjection do
   end
 
   defp should_interject?(_decision, _opts), do: false
+
+  defp log_classifier_decision(%Decision{} = decision) do
+    Logger.info(
+      "[Sue.Interjection] classifier decision should_interject=#{decision.should_interject} confidence=#{decision.confidence} reason=#{inspect(decision.reason)}"
+    )
+  end
 
   defp invoke_sue_ai(%Message{} = msg, %Decision{} = _decision, opts) do
     case check_invoke_limits(msg, opts) do
@@ -231,9 +299,44 @@ defmodule Sue.AI.Interjection do
     |> Keyword.merge(overrides)
     |> Keyword.put_new(:base_url, @default_base_url)
     |> Keyword.put_new(:model, @default_model)
+    |> Keyword.put_new(:provider, @default_provider)
     |> Keyword.put_new(:timeout, @default_timeout)
+    |> Keyword.put_new(:max_tokens, @default_max_tokens)
     |> Keyword.put_new(:threshold, @default_threshold)
   end
+
+  defp provider_opts(opts) do
+    opts
+    |> Keyword.take(@provider_opts)
+    |> Keyword.put(:extra_body, provider_extra_body(opts))
+  end
+
+  defp provider_extra_body(opts) do
+    opts
+    |> Keyword.get(:extra_body, %{})
+    |> normalize_extra_body()
+    |> put_ollama_options(Keyword.get(opts, :ollama_options))
+  end
+
+  defp normalize_extra_body(extra_body) when is_map(extra_body), do: extra_body
+  defp normalize_extra_body(_extra_body), do: %{}
+
+  defp put_ollama_options(extra_body, nil), do: extra_body
+  defp put_ollama_options(extra_body, false), do: extra_body
+  defp put_ollama_options(extra_body, []), do: extra_body
+
+  defp put_ollama_options(extra_body, options) when is_list(options) or is_map(options) do
+    Map.put(extra_body, "options", stringify_keys(options))
+  end
+
+  defp stringify_keys(map) when is_map(map) do
+    map
+    |> Enum.map(fn {key, value} -> {to_string(key), stringify_keys(value)} end)
+    |> Map.new()
+  end
+
+  defp stringify_keys(list) when is_list(list), do: list |> Map.new() |> stringify_keys()
+  defp stringify_keys(value), do: value
 
   defp recent_messages(%Message{} = msg, opts) do
     Keyword.get_lazy(opts, :recent_messages, fn ->
@@ -245,12 +348,13 @@ defmodule Sue.AI.Interjection do
     """
     Chat kind: #{chat_kind(msg)}
     Latest speaker: #{Account.friendly_name(msg.account)}
+    Latest message text: #{format_recent_body(msg)}
     Latest message has media: #{has_media?(msg)}
 
-    Recent transcript, oldest to newest. The final line is the latest message:
+    Recent transcript for context only. Classify only the latest message:
     #{format_transcript(recent_messages)}
 
-    Should Sue ask the smarter AI to respond to the latest message?
+    Return the classifier JSON for the latest message only.
     """
   end
 
@@ -316,7 +420,7 @@ defmodule Sue.AI.Interjection do
       ])
 
     confidence =
-      number_field(decoded, ["confidence", "score", "probability"]) ||
+      number_field(decoded, ["confidence", "confidence_number", "score", "probability"]) ||
         if(should_interject, do: 1.0, else: 0.0)
 
     %Decision{
